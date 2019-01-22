@@ -1,9 +1,7 @@
 
-#
-
-# Credit for the code structure in the implementations below and in subsequent lessons goes to these [contributors](https://github.com/joosthub/PyTorchNLPBook/graphs/contributors).
-
+############################################################################################
 # # Configuration
+############################################################################################
 
 # We will be using these configurations throughout the notebook for our task of predicting nationality given a surname.
 config = {
@@ -28,11 +26,10 @@ config = {
   }
 }
 
+############################################################################################
 # # Set up
+############################################################################################
 
-# We're going to get set up for our task by setting reproducability seeds with NumPy and PyTorch. We will also create a unique directory to store our configurations, model, etc.
-
-# Load PyTorch library
 
 import os
 import json
@@ -43,30 +40,28 @@ import uuid
 
 # ### Components
 def set_seeds(seed, cuda):
-    """ Set Numpy and PyTorch seeds.
-    """
+    """ Set Numpy and PyTorch seeds. """
     np.random.seed(seed)
     torch.manual_seed(seed)
     if cuda:
         torch.cuda.manual_seed_all(seed)
     print ("==> 🌱 Set NumPy and PyTorch seeds.")
+
 def generate_unique_id():
-    """Generate a unique uuid
-    preceded by a epochtime.
-    """
+    """Generate a unique uuid preceded by a epochtime. """
     timestamp = int(time.time())
     unique_id = "{}_{}".format(timestamp, uuid.uuid1())
     print ("==> 🔑 Generated unique id: {0}".format(unique_id))
     return unique_id
+
 def create_dirs(dirpath):
-    """Creating directories.
-    """
+    """Creating directories. """
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
         print ("==> 📂 Created {0}".format(dirpath))
+
 def check_cuda(cuda):
-    """Check to see if GPU is available.
-    """
+    """Check to see if GPU is available. """
     if not torch.cuda.is_available():
         cuda = False
     device = torch.device("cuda" if cuda else "cpu")
@@ -100,17 +95,19 @@ with open(config_fp, "w") as fp:
 # Check CUDA
 config["device"] = check_cuda(cuda=config["cuda"])
 
+
+############################################################################################
 # # Load data
+############################################################################################
 
 # Get the data from the GitHub URL and then load it into a Pandas DataFrame.
 import pandas as pd
 import urllib
 
 # ### Components
+
 def get_data(data_url, data_file):
-    """Get data from GitHub to notebook's
-    local drive.
-    """
+    """Get data from GitHub to notebook's local drive. """
     # Create dataset directory
     dirpath = os.path.dirname(data_file)
     create_dirs(dirpath)
@@ -121,9 +118,9 @@ def get_data(data_url, data_file):
     with open(config["data_file"], 'wb') as fp:
         fp.write(html)
     print ("==> 🐙 Downloading data from GitHub to {0}".format(data_file))
+
 def load_data(data_file):
-    """Load data from CSV to Pandas DataFrame.
-    """
+    """Load data from CSV to Pandas DataFrame. """
     # Load into DataFrame
     df = pd.read_csv(data_file, header=0)
     print ("==> 🍣 Raw data:")
@@ -138,7 +135,9 @@ get_data(data_url=config["data_url"], data_file=config["data_file"])
 # Load data into Pandas DataFrame
 df = load_data(data_file=config["data_file"])
 
+############################################################################################
 # # Split data
+############################################################################################
 
 # Split the data into train, validation and test sets where each split has similar class distributions. 
 import collections
@@ -187,7 +186,10 @@ split_df = split_data(
     val_size=config["val_size"],
     test_size=config["test_size"])
 
+
+############################################################################################
 # # Preprocessing
+############################################################################################
 
 # Preprocess the data in the DataFrame.
 import re
@@ -201,6 +203,7 @@ def preprocess_text(text):
     text = re.sub(r"[^a-zA-Z.!?_]+", r" ", text)
     text = text.strip()
     return text
+
 def preprocess_data(df):
     """ Preprocess the DataFrame.
     """
@@ -214,7 +217,10 @@ def preprocess_data(df):
 # Preprocessing
 preprocessed_df = preprocess_data(split_df)
 
+
+############################################################################################
 # # Vocabulary
+############################################################################################
 
 # Create vocabularies for the surnames and nationality classes.
 
@@ -276,7 +282,10 @@ index = nationality_vocab.lookup_token("English")
 print (index)
 print (nationality_vocab.lookup_index(index))
 
+
+############################################################################################
 # # Vectorizer
+############################################################################################
 
 # Vectorizes our data into numerical form using the vocabularies.
 
@@ -325,7 +334,9 @@ print (vectorizer.unvectorize(one_hot))
 
 # **Note**: When we vectorize our input with bagged one hot encoded format, we lose all the structure in our name. This is a major disadvantage of representing our text in bagged one-hot encoded form but we will explore more semantic structure preserving encoding methods later.
 
+############################################################################################
 # # Dataset
+############################################################################################
 
 # The Dataset will create vectorized data from the preprocessed data.
 import random
@@ -421,7 +432,9 @@ print (dataset.class_weights)
 # Sample checks
 sample(dataset=dataset)
 
+############################################################################################
 # # Model
+############################################################################################
 
 # Basic MLP architecture for surname classification.
 import torch.nn as nn
@@ -441,6 +454,7 @@ class SurnameModel(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 def initialize_model(config, vectorizer):
     """Initialize the model.
     """
@@ -458,7 +472,9 @@ def initialize_model(config, vectorizer):
 # Initializing model
 model = initialize_model(config=config, vectorizer=vectorizer)
 
+############################################################################################
 # # Training
+############################################################################################
 
 # Training operations for surname classification.
 import matplotlib.pyplot as plt
@@ -469,9 +485,9 @@ def compute_accuracy(y_pred, y_target):
     _, y_pred_indices = y_pred.max(dim=1)
     n_correct = torch.eq(y_pred_indices, y_target).sum().item()
     return n_correct / len(y_pred_indices) * 100
+
 def update_train_state(model, train_state):
-    """ Update train state during training.
-    """
+    """ Update train state during training. """
     # Verbose
     print ("[EPOCH]: {0} | [LR]: {1} | [TRAIN LOSS]: {2:.2f} | [TRAIN ACC]: {3:.1f}% | [VAL LOSS]: {4:.2f} | [VAL ACC]: {5:.1f}%".format(
       train_state['epoch_index'], train_state['learning_rate'], 
@@ -498,6 +514,7 @@ def update_train_state(model, train_state):
         # Stop early ?
         train_state['stop_early'] = train_state['early_stopping_step']           >= train_state['early_stopping_criteria']
     return train_state
+
 class Trainer(object):
     def __init__(self, dataset, model, model_file, device, shuffle, 
                num_epochs, batch_size, learning_rate, early_stopping_criteria):
@@ -661,7 +678,9 @@ trainer.run_test_loop()
 # Save all results
 save_train_state(train_state=trainer.train_state, save_dir=config["save_dir"])
 
+############################################################################################
 # # Inference
+############################################################################################
 
 # Components to see how our trained model fares against unseen surnames.
 

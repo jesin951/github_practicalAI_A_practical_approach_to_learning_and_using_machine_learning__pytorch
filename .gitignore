@@ -6,6 +6,9 @@ venv/
 tf_logs/
 dqn/
 log/
+datasets/
+experiments/
+
 
 **/*.pyc
 .idea/*.*
