@@ -1,13 +1,8 @@
 
-# coding: utf-8
-# # Computer Vision
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
 # 
-# In this notebook we're going to cover the basics of computer vision using CNNs. So far we've explored using CNNs for text but their initial origin began with computer vision tasks.
-# 
-# 
-# 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/cnn_cv.png" width=650>
+
 # # Configuration
 config = {
   "seed": 1234,
@@ -30,7 +25,9 @@ config = {
     "dropout_p": 0.1
   }
 }
+
 # # Set up
+
 # Load PyTorch library
 
 import os
@@ -39,6 +36,7 @@ import numpy as np
 import time
 import torch
 import uuid
+
 # ### Components
 def set_seeds(seed, cuda):
     """ Set Numpy and PyTorch seeds.
@@ -70,32 +68,42 @@ def check_cuda(cuda):
     device = torch.device("cuda" if cuda else "cpu")
     print ("==> 💻 Device: {0}".format(device))
     return device
+
 # ### Operations
+
 # Set seeds for reproducability
 set_seeds(seed=config["seed"], cuda=config["cuda"])
+
 # Generate unique experiment ID
 config["experiment_id"] = generate_unique_id()
+
 # Create experiment directory
 config["save_dir"] = os.path.join(config["save_dir"], config["experiment_id"])
 create_dirs(dirpath=config["save_dir"])
+
 # Expand file paths to store components later
 config["vectorizer_file"] = os.path.join(config["save_dir"], config["vectorizer_file"])
 config["model_file"] = os.path.join(config["save_dir"], config["model_file"])
 print ("Expanded filepaths: ")
 print ("{}".format(config["vectorizer_file"]))
 print ("{}".format(config["model_file"]))
+
 # Save config
 config_fp = os.path.join(config["save_dir"], "config.json")
 with open(config_fp, "w") as fp:
     json.dump(config, fp)
+
 # Check CUDA
 config["device"] = check_cuda(cuda=config["cuda"])
+
 # # Load data
+
 # We are going to get CIFAR10 data which contains images from ten unique classes. Each image has length 32, width 32 and three color channels (RGB). We are going to save these images in a directory. Each image will have its own directory (name will be the class).
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import tensorflow as tf
+
 # ### Components
 def get_data():
     """Get CIFAR10 data.
@@ -150,28 +158,38 @@ def load_data(data_dir, classes):
     print ("==> 🍣 Raw data:")
     print (df.head())
     return df
+
 # ### Operations
+
 # Get CIFAR10 data
 X, y = get_data()
 print ("X:", X.shape)
 print ("y:", y.shape)
+
 # Classes
 classes = {0: 'plane', 1: 'car', 2: 'bird', 3: 'cat', 4: 'deer', 5: 'dog', 
            6: 'frog', 7: 'horse', 8: 'ship', 9: 'truck'}
+
 # Create image directories
 create_class_dirs(data_dir=config["data_dir"], classes=classes)
+
 # Save images for each class
 for i, (image, label) in enumerate(zip(X, y)):
     _class = classes[label]
     im = Image.fromarray(image)
     im.save(os.path.join(config["data_dir"], _class, "{0:02d}.png".format(i)))
+
 # Visualize each class
 visualize_samples(data_dir=config["data_dir"], classes=classes)
+
 # Load data into DataFrame
 df = load_data(data_dir=config["data_dir"], classes=classes)
+
 # # Split data
+
 # Split the data into train, validation and test sets where each split has similar class distributions.
 import collections
+
 # ### Components
 def split_data(df, shuffle, train_size, val_size, test_size):
     """Split the data into train/val/test splits.
@@ -206,15 +224,20 @@ def split_data(df, shuffle, train_size, val_size, test_size):
     print ("\n==> 🖖 Splits:")
     print (split_df["split"].value_counts())
     return split_df
+
 # ### Operations
+
 # Split data
 split_df = split_data(
     df=df, shuffle=config["shuffle"],
     train_size=config["train_size"],
     val_size=config["val_size"],
     test_size=config["test_size"])
+
 # # Vocabulary
+
 # Create vocabularies for the image classes.
+
 # ### Components
 class Vocabulary(object):
     def __init__(self, token_to_idx=None, add_unk=True, unk_token="<UNK>"):
@@ -260,7 +283,9 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # ### Operations
+
 # Vocabulary instance
 category_vocab = Vocabulary(add_unk=False)
 for index, row in df.iterrows():
@@ -270,10 +295,13 @@ print (len(category_vocab)) # __len__
 index = category_vocab.lookup_token("bird")
 print (index)
 print (category_vocab.lookup_index(index))
+
 # # Sequence vocbulary
+
 # We will also create a vocabulary object for the actual images. It will store the mean and standard deviations for eahc image channel (RGB) which we will use later on for normalizing our images with the Vectorizer.
 from collections import Counter
 import string
+
 # ### Components
 class SequenceVocabulary(Vocabulary):
     def __init__(self, train_means, train_stds):
@@ -305,12 +333,17 @@ class SequenceVocabulary(Vocabulary):
     def __str__(self):
         return "<SequenceVocabulary(train_means: {0}, train_stds: {1}>".format(
             self.train_means, self.train_stds)
+
 # ### Operations
+
 # Create SequenceVocabulary instance
 image_vocab = SequenceVocabulary.from_dataframe(split_df)
 print (image_vocab) # __str__
+
 # # Vectorizer
+
 # The vectorizer will normalize our images using the vocabulary.
+
 # ### Components
 class ImageVectorizer(object):
     def __init__(self, image_vocab, category_vocab):
@@ -350,7 +383,9 @@ class ImageVectorizer(object):
     def to_serializable(self):
         return {'image_vocab': self.image_vocab.to_serializable(),
                 'category_vocab': self.category_vocab.to_serializable()}
+
 # ### Operations
+
 # Vectorizer instance
 vectorizer = ImageVectorizer.from_dataframe(split_df)
 print (vectorizer.image_vocab)
@@ -358,10 +393,13 @@ print (vectorizer.category_vocab)
 print (vectorizer.category_vocab.token_to_idx)
 image_vector = vectorizer.vectorize(split_df.iloc[0].image)
 print (image_vector.shape)
+
 # # Dataset
+
 # The Dataset will create vectorized data from the data.
 import random
 from torch.utils.data import Dataset, DataLoader
+
 # ### Components
 class ImageDataset(Dataset):
     def __init__(self, df, vectorizer, infer=False):
@@ -439,18 +477,24 @@ def sample(dataset):
     print ("Random sample: {0}".format(sample))
     print ("Unvectorized category: {0}".format(
         dataset.vectorizer.category_vocab.lookup_index(sample['category'])))
+
 # ### Operations
+
 # Load dataset and vectorizer
 dataset = ImageDataset.load_dataset_and_make_vectorizer(split_df)
 dataset.save_vectorizer(config["vectorizer_file"])
 vectorizer = dataset.vectorizer
 print (dataset.class_weights)
+
 # Sample checks
 sample(dataset=dataset)
+
 # # Model
+
 # Basic CNN architecture for image classification.
 import torch.nn as nn
 import torch.nn.functional as F
+
 # ### Components
 class ImageModel(nn.Module):
     def __init__(self, num_hidden_units, num_classes, dropout_p):
@@ -494,12 +538,17 @@ def initialize_model(config, vectorizer):
        dropout_p=config["fc"]["dropout_p"])
     print (model.named_modules)
     return model
+
 # ### Operations
+
 # Initializing model
 model = initialize_model(config=config, vectorizer=vectorizer)
+
 # # Training
+
 # Training operations for image classification.
 import torch.optim as optim
+
 # ### Components
 def compute_accuracy(y_pred, y_target):
     _, y_pred_indices = y_pred.max(dim=1)
@@ -675,7 +724,9 @@ def save_train_state(train_state, save_dir):
     with open(os.path.join(save_dir, "train_state.json"), "w") as fp:
         json.dump(train_state, fp)
     print ("==> ✅ Training complete!")
+
 # ### Operations
+
 # Training
 trainer = Trainer(
     dataset=dataset, model=model, model_file=config["model_file"],
@@ -684,18 +735,27 @@ trainer = Trainer(
     learning_rate=config["learning_rate"], 
     early_stopping_criteria=config["early_stopping_criteria"])
 trainer.run_train_loop()
+
 # Plot performance
 plot_performance(train_state=trainer.train_state, 
                  save_dir=config["save_dir"], show_plot=True)
+
 # Test performance
 trainer.run_test_loop()
+
 # Save all results
 save_train_state(train_state=trainer.train_state, save_dir=config["save_dir"])
+
 # ~60% test performance for our CIFAR10 dataset is not bad but we can do way better.
+
 # # Transfer learning
+
 # In this section, we're going to use a pretrained model that performs very well on a different dataset. We're going to take the architecture and the initial convolutional weights from the model to use on our data. We will freeze the initial convolutional weights and fine tune the later convolutional and fully-connected layers. 
+
 # 
+
 # Transfer learning works here because the initial convolution layers act as excellent feature extractors for common spatial features that are shared across images regardless of their class. We're going to leverage these large, pretrained models' feature extractors for our own dataset.
+
 # get_ipython().system('pip install torchvision')
 from torchvision import models
 model_names = sorted(name for name in models.__dict__
@@ -705,7 +765,9 @@ print (model_names)
 model_name = 'vgg19_bn'
 vgg_19bn = models.__dict__[model_name](pretrained=True) # Set false to train from scratch
 print (vgg_19bn.named_parameters)
+
 # The VGG model we chose has a `features` and a `classifier` component. The `features` component is composed of convolution and pooling layers which act as feature extractors. The `classifier` component is composed on fully connected layers. We're going to freeze most of the `feature` component and design our own FC layers for our CIFAR10 task. You can access the default code for all models at `/usr/local/lib/python3.6/dist-packages/torchvision/models` if you prefer cloning and modifying that instead.
+
 # ### Components
 class ImageModel(nn.Module):
     def __init__(self, feature_extractor, num_hidden_units, 
@@ -747,16 +809,20 @@ def initialize_model(config, vectorizer, feature_extractor):
        dropout_p=config["fc"]["dropout_p"])
     print (model.named_modules)
     return model
+
 # ### Operations
+
 # Initializing model
 model = initialize_model(config=config, vectorizer=vectorizer, 
                          feature_extractor=vgg_19bn.features)
+
 # Finetune last few conv layers and FC layers
 for i, param in enumerate(model.feature_extractor.parameters()):
     if i < 36:
         param.requires_grad = False
     else:
         param.requires_grad = True
+
 # Training
 trainer = Trainer(
     dataset=dataset, model=model, model_file=config["model_file"],
@@ -765,17 +831,23 @@ trainer = Trainer(
     learning_rate=config["learning_rate"], 
     early_stopping_criteria=config["early_stopping_criteria"])
 trainer.run_train_loop()
+
 # Plot performance
 plot_performance(train_state=trainer.train_state, 
                  save_dir=config["save_dir"], show_plot=True)
+
 # Test performance
 trainer.run_test_loop()
+
 # Save all results
 save_train_state(train_state=trainer.train_state, save_dir=config["save_dir"])
+
 # Much better performance! If you let it train long enough, we'll actually reach ~95% accuracy :)
+
 # ## Inference
 from pylab import rcParams
 rcParams['figure.figsize'] = 2, 2
+
 # ### Components
 class Inference(object):
     def __init__(self, model, vectorizer, device="cpu"):
@@ -802,27 +874,37 @@ class Inference(object):
                 category = self.vectorizer.category_vocab.lookup_index(index)
                 results.append({'category': category, 'probability': probability})
         return results
+
 # ### Operations
+
 # Load vectorizer
 with open(config["vectorizer_file"]) as fp:
     vectorizer = ImageVectorizer.from_serializable(json.load(fp))
+
 # Load the model
 model = initialize_model(config=config, vectorizer=vectorizer, feature_extractor=vgg_19bn.features)
 model.load_state_dict(torch.load(config["model_file"]))
+
 # Initialize
 inference = Inference(model=model, vectorizer=vectorizer, device=config["device"])
+
 # Get a sample
 sample = split_df[split_df.split=="test"].iloc[0]
 plt.imshow(sample.image)
 plt.axis("off")
 print ("Actual:", sample.category)
+
 # Inference
 category = list(vectorizer.category_vocab.token_to_idx.keys())[0] # random filler category
 infer_df = pd.DataFrame([[sample.image, category, "infer"]], columns=['image', 'category', 'split'])
 infer_dataset = ImageDataset(df=infer_df, vectorizer=vectorizer, infer=True)
 results = inference.predict_category(dataset=infer_dataset)
 results
+
 # # TODO
+
 # - segmentation
+
 # - interpretability via activation maps
+
 # - processing images of different sizes

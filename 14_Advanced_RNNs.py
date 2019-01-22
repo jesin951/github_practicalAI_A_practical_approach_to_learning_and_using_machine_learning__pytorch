@@ -1,19 +1,5 @@
-
-# coding: utf-8
-# # Advanced RNNs
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
-# 
-# In this notebook we're going to cover some advanced topics related to RNNs.
-# 
-# 1. Conditioned hidden state
-# 2. Char-level embeddings
-# 3. Encoder and decoder
-# 4. Attentional mechanisms
-# 5. Implementation
-# 
-# 
-# 
 # # Set up
+
 # Load PyTorch library
 
 import os
@@ -26,6 +12,7 @@ import numpy as np
 import pandas as pd
 import re
 import torch
+
 # Set Numpy and PyTorch seeds
 def set_seeds(seed, cuda):
     np.random.seed(seed)
@@ -33,10 +20,12 @@ def set_seeds(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
         
+
 # Creating directories
 def create_dirs(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -49,40 +38,57 @@ args = Namespace(
     num_layers=1,
     bidirectional=False,
 )
+
 # Set seeds
 set_seeds(seed=args.seed, cuda=args.cuda)
+
 # Check CUDA
 if not torch.cuda.is_available():
     args.cuda = False
 args.device = torch.device("cuda" if args.cuda else "cpu")
 print("Using CUDA: {}".format(args.cuda))
+
 # # Conditioned RNNs
+
 # Conditioning an RNN is to add extra information that will be helpful towards a prediction. We can encode (embed it) this information and feed it along with the sequential input into our model. For example, suppose in our document classificaiton example in the previous notebook, we knew the publisher of each news article (NYTimes, ESPN, etc.). We could have encoded that information to help with the prediction. There are several different ways of creating a conditioned RNN.
+
 # 
+
 # **Note**: If the conditioning information is novel for each input in the sequence, just concatenate it along with each time step's input.
+
 # 1. Make the initial hidden state the encoded information instead of using the initial zerod hidden state. Make sure that the size of the encoded information is the same as the hidden state for the RNN.
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/conditioned_rnn1.png" width=400>
 import torch.nn as nn
 import torch.nn.functional as F
+
 # Condition
 condition = torch.LongTensor([0, 2, 1, 2]) # batch size of 4 with a vocab size of 3
 condition_embeddings = nn.Embedding(
     embedding_dim=args.embedding_dim, # should be same as RNN hidden dim
     num_embeddings=args.condition_vocab_size) # of unique conditions
+
 # Initialize hidden state
 num_directions = 1
 if args.bidirectional:
     num_directions = 2
     
+
 # If using multiple layers and directions, the hidden state needs to match that size
 hidden_t = condition_embeddings(condition).unsqueeze(0).repeat(
     args.num_layers * num_directions, 1, 1).to(args.device) # initial state to RNN
 print (hidden_t.size())
+
 # Feed into RNN
+
 # y_out, _ = self.rnn(x_embedded, hidden_t)
+
 # 2. Concatenate the encoded information with the hidden state at each time step. Do not replace the hidden state because the RNN needs that to learn. 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/conditioned_rnn2.png" width=400>
+
 # Initialize hidden state
 hidden_t = torch.zeros((args.num_layers * num_directions, args.batch_size, args.rnn_hidden_dim))
 print (hidden_t.size())
@@ -91,6 +97,7 @@ def concat_condition(condition_embeddings, condition, hidden_t, num_layers, num_
         num_layers * num_directions, 1, 1)
     hidden_t = torch.cat([hidden_t, condition_t], 2)
     return hidden_t
+
 # Loop through the inputs time steps
 hiddens = []
 seq_size = 1
@@ -102,14 +109,23 @@ for t in range(seq_size):
     # Feed into RNN
     # hidden_t = rnn_cell(x_in[t], hidden_t)
     ...
+
 # # Char-level embeddings
+
 # Our conv operations will have inputs that are words in a sentence represented at the character level|  $\in \mathbb{R}^{NXSXWXE}$  and outputs are embeddings for each word (based on convlutions applied at the character level.) 
+
 # 
+
 # **Word embeddings**: capture the temporal correlations among
+
 # adjacent tokens so that similar words have similar representations. Ex. "New Jersey" is close to "NJ" is close to "Garden State", etc.
+
 # 
+
 # **Char embeddings**: create representations that map words at a character level. Ex. "toy" and "toys" will be close to each other.
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/char_embeddings.png" width=450>
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -160,10 +176,12 @@ class Model(nn.Module):
         z = torch.cat(z, 2) # join conv outputs
         
         return z
+
 # Input
 input_size = (args.batch_size, args.seq_size, args.word_size)
 x_in = torch.randint(low=0, high=args.vocab_size, size=input_size).long()
 print (x_in.size())
+
 # Initial char-level embedding model
 model = Model(embedding_dim=args.embedding_dim, 
               num_embeddings=args.vocab_size, 
@@ -171,15 +189,23 @@ model = Model(embedding_dim=args.embedding_dim,
               num_output_channels=args.num_filters,
               padding_idx=0)
 print (model.named_modules)
+
 # Forward pass to get char-level embeddings
 z = model(x_in)
 print (z.size())
+
 # There are several different ways you can use these char-level embeddings:
+
 # 
+
 # 1. Concat char-level embeddings with word-level embeddings, since we have an embedding for each word (at a char-level) and then feed it into an RNN. 
+
 # 2. You can feed the char-level embeddings into an RNN to processes them.
+
 # # Encoder and decoder
+
 # So far we've used RNNs to `encode` a sequential input and generate hidden states. We use these hidden states to `decode` the predictions. So far, the encoder was an RNN and the decoder was just a few fully connected layers followed by a softmax layer (for classification). But the encoder and decoder can assume other architectures as well. For example, the decoder could be an RNN that processes the hidden state outputs from the encoder RNN. 
+
 # Arguments
 args = Namespace(
     batch_size=64,
@@ -252,25 +278,45 @@ model = Model(embedding_dim=args.embedding_dim, num_embeddings=1000,
               num_layers=args.num_layers, bidirectional=args.bidirectional, 
               output_dim=4, dropout_p=args.dropout, padding_idx=0)
 print (model.named_parameters)
+
 # # Attentional mechanisms
+
 # When processing an input sequence with an RNN, recall that at each time step we process the input and the hidden state at that time step. For many use cases, it's advantageous to have access to the inputs at all time steps and pay selective attention to the them at each time step. For example, in machine translation, it's advantageous to have access to all the words when translating to another language because translations aren't necessarily word for word. 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/attention1.jpg" width=650>
+
 # Attention can sound a bit confusing so let's see what happens at each time step. At time step j, the model has processed inputs $x_0, x_1, x_2, ..., x_j$ and has generted hidden states $h_0, h_1, h_2, ..., h_j$. The idea is to use all the processed hidden states to make the prediction and not just the most recent one. There are several approaches to how we can do this.
+
 # 
+
 # With **soft attention**, we learn a vector of floating points (probabilities) to multiply with the hidden states to create the context vector.
+
 # 
+
 # Ex. [0.1, 0.3, 0.1, 0.4, 0.1]
+
 # 
+
 # With **hard attention**, we can learn a binary vector to multiply with the hidden states to create the context vector. 
+
 # 
+
 # Ex. [0, 0, 0, 1, 0]
+
 # We're going to focus on soft attention because it's more widley used and we can visualize how much of each hidden state helps with the prediction, which is great for interpretability. 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/attention2.jpg" width=650>
+
 # We're going to implement attention in the document classification task below.
+
 # # Document classification with RNNs
+
 # We're going to implement the same document classification task as in the previous notebook but we're going to use an attentional interface for interpretability.
+
 # 
+
 # **Why not machine translation?** Normally, machine translation is the go-to example for demonstrating attention but it's not really practical. How many situations can you think of that require a seq to generate another sequence? Instead we're going to apply attention with our document classification example to see which input tokens are more influential towards predicting the genre.
+
 # ## Set up
 from argparse import Namespace
 import collections
@@ -287,6 +333,7 @@ def set_seeds(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
         
+
 # Creating directories
 def create_dirs(dirpath):
     if not os.path.exists(dirpath):
@@ -317,18 +364,23 @@ args = Namespace(
     bidirectional=False,
     dropout_p=0.25,
 )
+
 # Set seeds
 set_seeds(seed=args.seed, cuda=args.cuda)
+
 # Create save dir
 create_dirs(args.save_dir)
+
 # Expand filepaths
 args.vectorizer_file = os.path.join(args.save_dir, args.vectorizer_file)
 args.model_state_file = os.path.join(args.save_dir, args.model_state_file)
+
 # Check CUDA
 if not torch.cuda.is_available():
     args.cuda = False
 args.device = torch.device("cuda" if args.cuda else "cpu")
 print("Using CUDA: {}".format(args.cuda))
+
 # ## Data
 import urllib
 url = "https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/data/news.csv"
@@ -371,6 +423,7 @@ def preprocess_text(text):
     
 split_df.title = split_df.title.apply(preprocess_text)
 split_df.head()
+
 # ## Vocabulary
 class Vocabulary(object):
     def __init__(self, token_to_idx=None):
@@ -405,6 +458,7 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # Vocabulary instance
 category_vocab = Vocabulary()
 for index, row in df.iterrows():
@@ -414,7 +468,9 @@ print (len(category_vocab)) # __len__
 index = category_vocab.lookup_token("Business")
 print (index)
 print (category_vocab.lookup_index(index))
+
 # ## Sequence vocabulary
+
 # Next, we're going to create our Vocabulary classes for the article's title, which is a sequence of words.
 from collections import Counter
 import string
@@ -453,12 +509,14 @@ class SequenceVocabulary(Vocabulary):
         return "<SequenceVocabulary(size=%d)>" % len(self.token_to_idx)
     def __len__(self):
         return len(self.token_to_idx)
+
 # Get word counts
 word_counts = Counter()
 for title in split_df.title:
     for token in title.split(" "):
         if token not in string.punctuation:
             word_counts[token] += 1
+
 # Create SequenceVocabulary instance
 title_word_vocab = SequenceVocabulary()
 for word, word_count in word_counts.items():
@@ -469,7 +527,9 @@ print (len(title_word_vocab)) # __len__
 index = title_word_vocab.lookup_token("general")
 print (index)
 print (title_word_vocab.lookup_index(index))
+
 # We're also going to create an instance fo SequenceVocabulary that processes the input on a character level.
+
 # Create SequenceVocabulary instance
 title_char_vocab = SequenceVocabulary()
 for title in split_df.title:
@@ -480,7 +540,9 @@ print (len(title_char_vocab)) # __len__
 index = title_char_vocab.lookup_token("g")
 print (index)
 print (title_char_vocab.lookup_index(index))
+
 # ## Vectorizer
+
 # Something new that we introduce in this Vectorizer is calculating the length of our input sequence. We will use this later on to extract the last relevant hidden state for each input sequence.
 class NewsVectorizer(object):
     def __init__(self, title_word_vocab, title_char_vocab, category_vocab):
@@ -560,6 +622,7 @@ class NewsVectorizer(object):
         return {'title_word_vocab': self.title_word_vocab.to_serializable(),
                 'title_char_vocab': self.title_char_vocab.to_serializable(),
                 'category_vocab': self.category_vocab.to_serializable()}
+
 # Vectorizer instance
 vectorizer = NewsVectorizer.from_dataframe(split_df, cutoff=args.cutoff)
 print (vectorizer.title_word_vocab)
@@ -574,6 +637,7 @@ print (word_vector)
 print (char_vector)
 print (vectorizer.unvectorize_word_vector(word_vector))
 print (vectorizer.unvectorize_char_vector(char_vector))
+
 # ## Dataset
 from torch.utils.data import Dataset, DataLoader
 class NewsDataset(Dataset):
@@ -640,6 +704,7 @@ class NewsDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # Dataset instance
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df,
                                                        cutoff=args.cutoff)
@@ -652,7 +717,9 @@ print (input_['category'])
 print (dataset.vectorizer.unvectorize_word_vector(input_['title_word_vector']))
 print (dataset.vectorizer.unvectorize_char_vector(input_['title_char_vector']))
 print (dataset.class_weights)
+
 # ## Model
+
 # embed → encoder → attend → predict
 import torch.nn as nn
 import torch.nn.functional as F
@@ -790,6 +857,7 @@ class NewsModel(nn.Module):
         encoder_outputs = self.encoder(x_word, x_char, x_lengths, device)
         y_pred = self.decoder(encoder_outputs, apply_softmax)
         return y_pred
+
 # ## Training
 import torch.optim as optim
 class Trainer(object):
@@ -1022,6 +1090,7 @@ class Trainer(object):
         self.train_state["done_training"] = True
         with open(os.path.join(self.save_dir, "train_state.json"), "w") as fp:
             json.dump(self.train_state, fp)
+
 # Initialization
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df,
                                                        cutoff=args.cutoff)
@@ -1042,6 +1111,7 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   word_padding_idx=vectorizer.title_word_vocab.mask_index,
                   char_padding_idx=vectorizer.title_char_vocab.mask_index)
 print (model.named_modules)
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -1050,14 +1120,18 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # Plot performance
 trainer.plot_performance()
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # ## Inference
 class Inference(object):
     def __init__(self, model, vectorizer, device="cpu"):
@@ -1090,9 +1164,11 @@ class Inference(object):
                 results.append({'category': category, 
                                 'probability': probability})
         return attn_scores, results
+
 # Load vectorizer
 with open(args.vectorizer_file) as fp:
     vectorizer = NewsVectorizer.from_serializable(json.load(fp))
+
 # Load the model
 model = NewsModel(embedding_dim=args.embedding_dim, 
                   num_word_embeddings=len(vectorizer.title_word_vocab), 
@@ -1110,6 +1186,7 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   char_padding_idx=vectorizer.title_char_vocab.mask_index)
 model.load_state_dict(torch.load(args.model_state_file))
 print (model.named_modules)
+
 # Initialize
 inference = Inference(model=model, vectorizer=vectorizer, device="cpu")
 class InferenceDataset(Dataset):
@@ -1137,6 +1214,7 @@ class InferenceDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # Inference
 title = input("Enter a title to classify: ")
 infer_df = pd.DataFrame([title], columns=['title'])
@@ -1144,7 +1222,9 @@ infer_df.title = infer_df.title.apply(preprocess_text)
 infer_dataset = InferenceDataset(infer_df, vectorizer)
 attn_scores, results = inference.predict_category(dataset=infer_dataset)
 results
+
 # # Interpretability
+
 # We can inspect the probability vector that is generated at each time step to visualize the importance of each of the previous hidden states towards a particular time step's prediction. 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -1155,39 +1235,75 @@ ax.set_xticklabels(tokens, rotation=45)
 ax.set_xlabel("Token")
 ax.set_ylabel("Importance\n")
 plt.show()
+
 # # Layer normalization
+
 # Recall from our [CNN notebook](https://colab.research.google.com/github/GokuMohandas/practicalAI/blob/master/notebooks/11_Convolutional_Neural_Networks.ipynb) that we used batch normalization to deal with internal covariant shift. Our activations will experience the same issues with RNNs but we will use a technique known as [layer normalization](https://arxiv.org/abs/1607.06450) (layernorm) to maintain zero mean unit variance on the activations. 
+
 # 
+
 # With layernorm it's a bit different from batchnorm. We compute the mean and var for every single sample (instead of each hidden dim) for each layer independently and then do the operations on the activations before they go through the nonlinearities. PyTorch's [LayerNorm](https://pytorch.org/docs/stable/nn.html#torch.nn.LayerNorm) class abstracts all of this for us when we feed in inputs to the layer.
+
 # $ LN = \frac{a - \mu_{L}}{\sqrt{\sigma^2_{L} + \epsilon}}  * \gamma + \beta $
+
 # 
+
 # where:
+
 # * $a$ = activation | $\in \mathbb{R}^{NXH}$ ($N$ is the number of samples, $H$ is the hidden dim)
+
 # * $ \mu_{L}$ = mean of input| $\in \mathbb{R}^{NX1}$
+
 # * $\sigma^2_{L}$ = variance of input | $\in \mathbb{R}^{NX1}$
+
 # * $epsilon$ = noise
+
 # * $\gamma$ = scale parameter (learned parameter)
+
 # * $\beta$ = shift parameter (learned parameter)
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/layernorm.png" width=400>
+
 # 
+
 # The most useful location to apply layernorm will be inside the RNN on the activations before the non-linearities. However, this is a bit involved and though PyTorch has a [LayerNorm](https://pytorch.org/docs/stable/nn.html#torch.nn.LayerNorm) class, they do not have an RNN that has built in layernorm yet. You could implement the RNN yourself and manually add layernorm by following a similar setup like below.
+
 # 
+
 # ```python
+
 # # Layernorm
+
 # for t in range(seq_size):
+
 #     # Normalize over hidden dim
+
 #     layernorm = nn.LayerNorm(args.hidden_dim)
+
 #     # Activating the module
+
 #     a = layernorm(x)
+
 # ```
+
 # # TODO
+
 # - attn visualization isn't always great
+
 # - bleu score
+
 # - ngram-overlap
+
 # - perplexity
+
 # - beamsearch
+
 # - hierarchical softmax
+
 # - hierarchical attention
+
 # - Transformer networks
+
 # - attention interpretability is hit/miss
+
 # 

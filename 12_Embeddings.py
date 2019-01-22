@@ -1,58 +1,3 @@
-
-# coding: utf-8
-# # Embeddings
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
-# 
-# So far, we've represented text in a bagged one-hot encoded form which is a n-dimensional array where each index corresponds to a token. The value at that index corresponds to the number of times the word appears in the sentence. This method forces us to completely lose the structural information in our inputs. 
-# 
-# ```python
-# [0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0.
-#  0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0.
-#  0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
-#  0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]```
-#  
-#  We've also represented our input in a one-hot encoded form where each token is represented by an n-dimensional array. T
-#  
-#  ```python
-# [[0. 0. 0. ... 0. 0. 0.]
-#  [0. 0. 1. ... 0. 0. 0.]
-#  [0. 0. 0. ... 0. 0. 0.]
-#  ...
-#  [0. 0. 0. ... 0. 0. 0.]
-#  [0. 0. 0. ... 0. 0. 0.]
-#  [0. 0. 0. ... 0. 0. 0.]]
-# ```
-# 
-# his allows us to preserve the structural information but there are two major disadvantages here. If we have a large vocabulary, the representation length for each token will be massive leading to large computes. And though we preserve the structure within the text, the actual representation for each token does not preserve any relationship with respect to other tokens.
-# 
-# In this notebook, we're going to learn about embeddings and how they address all the shortcomings of the representation methods we've seen so far.
-# 
-# 
-# 
-# 
-# # Overview
-# * **Objective:**  Represent tokens in text that capture the intrinsic semantic relationships.
-# * **Advantages:** 
-#     * Low-dimensionality while capturing relationships.
-#     * Interpretable token representations
-# * **Disadvantages:** None
-# * **Miscellaneous:** There are lot's of pretrained embeddings to choose from but you can also train your own from scratch.
-# # Learning embeddings
-# The main idea of embeddings is to have fixed length representations for the tokens in a text regardless of the number of tokens in the vocabulary. So instead of each token representation having the shape [1XV] where V is vocab size, each token now has the shape [1 X D] where D is the embedding size (usually 50, 100, 200, 300). The numbers in the representation will no longer be 0s and 1s but rather floats that represent that token in a D-dimensional latent space. If the embeddings really did capture the relationship between tokens, then we should be able to inspect this latent space and confirm known relationships (we'll do this soon).
-# 
-# But how do we learn the embeddings the first place? The intuition behind embeddings is that the definition of a token depends on the token itself but on it's context. There are several different ways of doing this:
-# 
-# 1. Given the word in the context, predict the target word (CBOW - continuous bag of words).
-# 2. Given the target word, predict the context word (skip-gram).
-# 3. Given a sequence of words, predict the next word (LM - language modeling).
-# 
-# All of these approaches involve create data to train our model on. Every word in a sentence becomes the target word and the context words are determines by a window. In the image below (skip-gram), the window size is 2. We repeat this for every sentence in our corpus and this results in our training data for the unsupervised task. This in an unsupervised learning technique since we don't have official labels for contexts. The idea is that similar target words will appear with similar contexts and we can learn this relationship by repeatedly training our mode with (context, target) pairs.
-# 
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/skipgram.png" width=600>
-# 
-# We can learn embeddings using any of these approaches above and some work better than others. You can inspect the learned embeddings but the best way to choose an approach is to empirically validate the performance on a supervised task. We can learn embeddings by creating our models in PyTorch but instead, we're going to use a library that specializes in embeddings and topic modeling called [Gensim](https://radimrehurek.com/gensim/). 
-# In[1]:
-# get_ipython().system('pip install gensim ')
 # In[2]:
 import os
 from argparse import Namespace
@@ -76,13 +21,16 @@ args = Namespace(
     skip_gram=1, # 0 = CBOW
     negative_sampling=20,
 )
+
 # Upload data from GitHub to notebook's local drive
 url = "https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/data/harrypotter.txt"
 response = urllib.request.urlopen(url)
 html = response.read()
 with open(args.data_file, 'wb') as fp:
     fp.write(html)
+
 # In[5]:
+
 # Split text into sentences
 tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 with open(args.data_file, encoding='cp1252') as fp:
@@ -90,6 +38,7 @@ with open(args.data_file, encoding='cp1252') as fp:
 sentences = tokenizer.tokenize(book)
 print (len(sentences))
 print (sentences[11])
+
 # Preprocessing
 def preprocess_text(text):
     text = ' '.join(word.lower() for word in text.split(" "))
@@ -97,32 +46,48 @@ def preprocess_text(text):
     text = re.sub(r"[^a-zA-Z.,!?]+", r" ", text)
     text = text.strip()
     return text
+
 # In[7]:
+
 # Clean sentences
 sentences = [preprocess_text(sentence) for sentence in sentences]
 print (sentences[11])
+
 # In[8]:
+
 # Process sentences for gensim
 sentences = [sentence.split(" ") for sentence in sentences]
 print (sentences[11])
+
 # When we have large vocabularies to learn embeddings for, things can get complex very quickly. Recall that the backpropagation with softmax updates both the correct and incorrect class weights. This becomes a massive computation for every backwas pass we do so a workaround is to use [negative sampling](http://mccormickml.com/2017/01/11/word2vec-tutorial-part-2-negative-sampling/) which only updates the correct class and a few arbitrary incorrect classes (negative_sampling=20). We're able to do this because of the large amount of training data where we'll see the same word as the target class multiple times.
+
 # 
+
 # 
+
 # In[9]:
+
 # Super fast because of optimized C code under the hood
 model = Word2Vec(sentences=sentences, size=args.embedding_dim, 
                  window=args.window, min_count=args.min_count, 
                  sg=args.skip_gram, negative=args.negative_sampling)
 print (model)
+
 # In[10]:
+
 # Vector for each word
 model.wv.get_vector("potter")
+
 # In[11]:
+
 # Get nearest neighbors (excluding itself)
 model.wv.most_similar(positive="scar", topn=5)
+
 # Save the weights 
 model.wv.save_word2vec_format('model.txt', binary=False)
+
 # # Pretrained embeddings
+
 # We can learn embeddings from scratch using one of the approaches above but we can also leverage pretrained embeddings that have been trained on millions of documents. Popular ones include Word2Vec (skip-gram) or GloVe (global word-word co-occurrence). We can validate that these embeddings captured meaningful semantic relationships by confirming them.
 from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.models import KeyedVectors
@@ -131,27 +96,39 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from zipfile import ZipFile
 from urllib.request import urlopen
+
 # In[14]:
+
 # Unzip the file (may take ~3 minutes)
 resp = urlopen('http://nlp.stanford.edu/data/glove.6B.zip')
 zipfile = ZipFile(BytesIO(resp.read()))
 zipfile.namelist()
+
 # In[15]:
+
 # Write embeddings
 embeddings_file = 'glove.6B.{0}d.txt'.format(args.embedding_dim)
 zipfile.extract(embeddings_file)
+
 # In[16]:
+
 # Save GloVe embeddings to local directory in word2vec format
 word2vec_output_file = '{0}.word2vec'.format(embeddings_file)
 glove2word2vec(embeddings_file, word2vec_output_file)
+
 # Load embeddings (may take a minute)
 glove = KeyedVectors.load_word2vec_format(word2vec_output_file, binary=False)
+
 # In[18]:
+
 # (king - man) + woman = ?
 glove.most_similar(positive=['woman', 'king'], negative=['man'], topn=5)
+
 # In[19]:
+
 # Get nearest neighbors (exlcusing itself)
 glove.wv.most_similar(positive="goku", topn=5)
+
 # Reduce dimensionality for plotting
 X = glove[glove.wv.vocab]
 pca = PCA(n_components=2)
@@ -162,22 +139,36 @@ def plot_embeddings(words, embeddings, pca_results):
         plt.scatter(pca_results[index, 0], pca_results[index, 1])
         plt.annotate(word, xy=(pca_results[index, 0], pca_results[index, 1]))
     plt.show()
+
 # In[22]:
 plot_embeddings(words=["king", "queen", "man", "woman"], embeddings=glove, 
                 pca_results=pca_results)
+
 # In[23]:
+
 # Bias in embeddings
 glove.most_similar(positive=['woman', 'doctor'], negative=['man'], topn=5)
+
 # # Using Embeddings
+
 # There are several different ways to use embeddings. 
+
 # 
+
 # 1. Use your own trained embeddings (trained on an unsupervised dataset).
+
 # 2. Use pretrained embeddings (GloVe, word2vec, etc.)
+
 # 3. Randomly initialized embeddings.
+
 # 
+
 # Once you have chosen embeddings, you can choose to freeze them or continue to train them using the supervised data (this could lead to overfitting). In this example, we're going to use GloVe embeddings and freeze them during training. Our task will be to predict an article's category given its title.
+
 # ## Set up
+
 # In[24]:
+
 # Load PyTorch library
 
 import os
@@ -189,6 +180,7 @@ import numpy as np
 import pandas as pd
 import re
 import torch
+
 # Set Numpy and PyTorch seeds
 def set_seeds(seed, cuda):
     np.random.seed(seed)
@@ -196,11 +188,14 @@ def set_seeds(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
         
+
 # Creating directories
 def create_dirs(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+
 # In[27]:
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -223,38 +218,49 @@ args = Namespace(
     hidden_dim=100,
     dropout_p=0.1,
 )
+
 # Set seeds
 set_seeds(seed=args.seed, cuda=args.cuda)
+
 # Create save dir
 create_dirs(args.save_dir)
+
 # Expand filepaths
 args.vectorizer_file = os.path.join(args.save_dir, args.vectorizer_file)
 args.model_state_file = os.path.join(args.save_dir, args.model_state_file)
+
 # Check CUDA
 if not torch.cuda.is_available():
     args.cuda = False
 args.device = torch.device("cuda" if args.cuda else "cpu")
 print("Using CUDA: {}".format(args.cuda))
+
 # ## Data
 import re
 import urllib
+
 # Upload data from GitHub to notebook's local drive
 url = "https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/data/news.csv"
 response = urllib.request.urlopen(url)
 html = response.read()
 with open(args.data_file, 'wb') as fp:
     fp.write(html)
+
 # In[30]:
+
 # Raw data
 df = pd.read_csv(args.data_file, header=0)
 df.head()
+
 # In[31]:
+
 # Split by category
 by_category = collections.defaultdict(list)
 for _, row in df.iterrows():
     by_category[row.category].append(row.to_dict())
 for category in by_category:
     print ("{0}: {1}".format(category, len(by_category[category])))
+
 # Create split data
 final_list = []
 for _, item_list in sorted(by_category.items()):
@@ -273,11 +279,15 @@ for _, item_list in sorted(by_category.items()):
         item['split'] = 'test'  
     # Add to final list
     final_list.extend(item_list)
+
 # In[33]:
+
 # df with split datasets
 split_df = pd.DataFrame(final_list)
 split_df["split"].value_counts()
+
 # In[34]:
+
 # Preprocessing
 def preprocess_text(text):
     text = ' '.join(word.lower() for word in text.split(" "))
@@ -287,6 +297,7 @@ def preprocess_text(text):
     
 split_df.title = split_df.title.apply(preprocess_text)
 split_df.head()
+
 # ## Vocabulary
 class Vocabulary(object):
     def __init__(self, token_to_idx=None):
@@ -321,7 +332,9 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # In[36]:
+
 # Vocabulary instance
 category_vocab = Vocabulary()
 for index, row in df.iterrows():
@@ -331,7 +344,9 @@ print (len(category_vocab)) # __len__
 index = category_vocab.lookup_token("Business")
 print (index)
 print (category_vocab.lookup_index(index))
+
 # ## Sequence vocabulary
+
 # Next, we're going to create our Vocabulary classes for the article's title, which is a sequence of tokens.
 from collections import Counter
 import string
@@ -370,13 +385,16 @@ class SequenceVocabulary(Vocabulary):
         return "<SequenceVocabulary(size=%d)>" % len(self.token_to_idx)
     def __len__(self):
         return len(self.token_to_idx)
+
 # In[39]:
+
 # Get word counts
 word_counts = Counter()
 for title in split_df.title:
     for token in title.split(" "):
         if token not in string.punctuation:
             word_counts[token] += 1
+
 # Create SequenceVocabulary instance
 title_vocab = SequenceVocabulary()
 for word, word_count in word_counts.items():
@@ -387,6 +405,7 @@ print (len(title_vocab)) # __len__
 index = title_vocab.lookup_token("general")
 print (index)
 print (title_vocab.lookup_index(index))
+
 # ## Vectorizer
 class NewsVectorizer(object):
     def __init__(self, title_vocab, category_vocab):
@@ -435,7 +454,9 @@ class NewsVectorizer(object):
     def to_serializable(self):
         return {'title_vocab': self.title_vocab.to_serializable(),
                 'category_vocab': self.category_vocab.to_serializable()}
+
 # In[41]:
+
 # Vectorizer instance
 vectorizer = NewsVectorizer.from_dataframe(split_df, cutoff=args.cutoff)
 print (vectorizer.title_vocab)
@@ -445,6 +466,7 @@ vectorized_title = vectorizer.vectorize(preprocess_text(
 print (np.shape(vectorized_title))
 print (vectorized_title)
 print (vectorizer.unvectorize(vectorized_title))
+
 # ## Dataset
 from torch.utils.data import Dataset, DataLoader
 class NewsDataset(Dataset):
@@ -512,7 +534,9 @@ class NewsDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # In[45]:
+
 # Dataset instance
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df, 
                                                        cutoff=args.cutoff)
@@ -521,13 +545,21 @@ title_vector = dataset[5]['title'] # __getitem__
 print (title_vector)
 print (dataset.vectorizer.unvectorize(title_vector))
 print (dataset.class_weights)
+
 # ## Model
+
 # input → embedding → conv → FC 
+
 # 
+
 # We will be using 1d conv operations ([nn.Conv1D](https://pytorch.org/docs/stable/nn.html#torch.nn.Conv1d)) even though our inputs are words because we are not representing them at a character level. The inputs are of shape $\in \mathbb{R}^{NXSXE}$
+
 # * where:
+
 #     * N = batchsize
+
 #     * S = max sentence length 
+
 #     * E = embedding dim at a word level
 import torch.nn as nn
 import torch.nn.functional as F
@@ -586,6 +618,7 @@ class NewsModel(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 # ## Training
 import torch.optim as optim
 class Trainer(object):
@@ -787,7 +820,9 @@ class Trainer(object):
         self.train_state["done_training"] = True
         with open(os.path.join(self.save_dir, "train_state.json"), "w") as fp:
             json.dump(self.train_state, fp)
+
 # In[52]:
+
 # Initialization
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df, 
                                                        cutoff=args.cutoff)
@@ -801,7 +836,9 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   dropout_p=args.dropout_p, pretrained_embeddings=None, 
                   padding_idx=vectorizer.title_vocab.mask_index)
 print (model.named_modules)
+
 # In[53]:
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -810,25 +847,40 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # In[54]:
+
 # Plot performance
 trainer.plot_performance()
+
 # In[55]:
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # ## Using GloVe embeddings
+
 # We just used some randomly initialized embeddings and we were able to receive decent performance. Keep in mind that this may not always be the case and we may overfit on other datasets with this approach. We're now going to use pretrained GloVe embeddings to initialize our embeddings. We will train our model on the supervised task and assess the performance by first freezing these embeddings (so they don't change during training) and then not freezing them and allowing them to be trained. 
+
 # 
+
 # ```python
+
 # pretrained_embeddings = torch.from_numpy(pretrained_embeddings).float()
+
 # self.embeddings = nn.Embedding(embedding_dim=embedding_dim, 
+
 #                                num_embeddings=num_embeddings, 
+
 #                                padding_idx=padding_idx, 
+
 #                                _weight=pretrained_embeddings)
+
 # ```
 def load_glove_embeddings(embeddings_file):
     word_to_idx = {}
@@ -854,12 +906,15 @@ def make_embeddings_matrix(words):
             embeddings[i, :] = embedding_i
     return embeddings
 args.use_glove_embeddings = True
+
 # In[59]:
+
 # Initialization
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df, 
                                                        cutoff=args.cutoff)
 dataset.save_vectorizer(args.vectorizer_file)
 vectorizer = dataset.vectorizer
+
 # Create embeddings
 embeddings = None
 if args.use_glove_embeddings:
@@ -868,7 +923,9 @@ if args.use_glove_embeddings:
     embeddings = make_embeddings_matrix(words=words)
     print ("<Embeddings(words={0}, dim={1})>".format(
         np.shape(embeddings)[0], np.shape(embeddings)[1]))
+
 # In[60]:
+
 # Initialize model
 model = NewsModel(embedding_dim=args.embedding_dim, 
                   num_embeddings=len(vectorizer.title_vocab), 
@@ -878,7 +935,9 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   dropout_p=args.dropout_p, pretrained_embeddings=embeddings, 
                   padding_idx=vectorizer.title_vocab.mask_index)
 print (model.named_modules)
+
 # In[61]:
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -887,25 +946,39 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # In[62]:
+
 # Plot performance
 trainer.plot_performance()
+
 # In[63]:
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # ## Freeze embeddings
+
 # Now we're going to freeze our GloVe embeddings and train on the supervised task. The only modification in the model is to turn on `freeze_embeddings`:
+
 # 
+
 # ```python
+
 # if freeze_embeddings:
+
 #     self.embeddings.weight.requires_grad = False
+
 # ```
 args.freeze_embeddings = True
+
 # In[66]:
+
 # Initialize model
 model = NewsModel(embedding_dim=args.embedding_dim, 
                   num_embeddings=len(vectorizer.title_vocab), 
@@ -916,7 +989,9 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   freeze_embeddings=args.freeze_embeddings,
                   padding_idx=vectorizer.title_vocab.mask_index)
 print (model.named_modules)
+
 # In[67]:
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -925,24 +1000,40 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # In[68]:
+
 # Plot performance
 trainer.plot_performance()
+
 # In[69]:
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # So you can see that using GloVe embeddings but not freezing them resulted in the best results on the test dataset. Different tasks will yield different results so you need to choose whether or not to freeze your embeddings based on empirical results.
+
 # # TODO
+
 # * when to use skip-gram/CBOW
+
 #     * According to Mikolov:
+
 #         
+
 #         Skip-gram: works well with small amount of the training data, represents well even rare words or phrases.
+
 #         
+
 #         CBOW: several times faster to train than the skip-gram, slightly better accuracy for the frequent words
+
 # * Loading word2vec
+
 # * interpretable conv filters since we apply it on words here
+
 # * [contextualized word embeddings](https://arxiv.org/abs/1607.00578)

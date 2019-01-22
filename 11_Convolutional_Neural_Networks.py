@@ -1,48 +1,30 @@
 
-# coding: utf-8
-# # Convolutional Neural Networks
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
-# 
-# In this lesson we will learn the basics of Convolutional Neural Networks (CNNs) applied to text for natural language processing (NLP) tasks. CNNs are traditionally used on images and there are plenty of [tutorials](https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html) that cover this. But we're going to focus on using CNN on text data which yields amazing results. 
-# 
-# 
-# # Overview
-# 
-# The diagram below from this [paper](https://arxiv.org/abs/1510.03820) shows how 1D convolution is applied to the words in a sentence. 
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/cnn_text.png" width=500>
-# * **Objective:**  Detect spatial substructure from input data.
-# * **Advantages:** 
-#   * Small number of weights (shared)
-#   * Parallelizable
-#   * Detects spatial substrcutures (feature extractors)
-#   * Interpretable via filters
-#   * Used for in images/text/time-series etc.
-# * **Disadvantages:**
-#   * Many hyperparameters (kernel size, strides, etc.)
-#   * Inputs have to be of same width (image dimensions, text length, etc.)
-# * **Miscellaneous:** 
-#   * Lot's of deep CNN architectures constantly updated for SOTA performance
-# # Filters
-# At the core of CNNs are filters (weights, kernels, etc.) which convolve (slide) across our input to extract relevant features. The filters are initialized randomly but learn to pick up meaningful features from the input that aid in optimizing for the objective. We're going to teach CNNs in an unorthodox method where we entirely focus on applying it to 2D text data. Each input is composed of words and we will be representing each word as one-hot encoded vector which gives us our 2D input. The intuition here is that each filter represents a feature and we will use this filter on other inputs to capture the same feature. This is known as parameter sharing.
-# 
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/conv.gif" width=400>
 # In[1]:
+
 # Loading PyTorch library
 
 import torch
 import torch.nn as nn
+
 # Our inputs are a batch of 2D text data. Let's make an input with 64 samples, where each sample has 8 words and each word is represented by a array of 10 values (one hot encoded with vocab size of 10). This gives our inputs the size (64, 8, 10). The [PyTorch CNN modules](https://pytorch.org/docs/stable/nn.html#convolution-functions) prefer inputs to have the channel dim (one hot vector dim in our case) to be in the second position, so our inputs are of shape (64, 10, 8).
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/cnn_text1.png" width=400>
+
 # In[3]:
+
 # Assume all our inputs have the same # of words
 batch_size = 64
 sequence_size = 8 # words per input
 one_hot_size = 10 # vocab size (num_input_channels)
 x = torch.randn(batch_size, one_hot_size, sequence_size)
 print("Size: {}".format(x.shape))
+
 # We want to convolve on this input using filters. For simplicity we will use just 5 filters that is of size (1, 2) and has the same depth as the number of channels (one_hot_size). This gives our filter a shape of (5, 2, 10) but recall that PyTorch CNN modules prefer to have the channel dim (one hot vector dim in our case) to be in the second position so the filter is of shape (5, 10, 2).
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/cnn_text2.png" width=400>
+
 # In[4]:
+
 # Create filters for a conv layer
 out_channels = 5 # of filters
 kernel_size = 2 # filters size 2
@@ -51,40 +33,69 @@ print("Size: {}".format(conv1.weight.shape))
 print("Filter size: {}".format(conv1.kernel_size[0]))
 print("Padding: {}".format(conv1.padding[0]))
 print("Stride: {}".format(conv1.stride[0]))
+
 # When we apply this filter on our inputs, we receive an output of shape (64, 5, 7). We get 64 for the batch size, 5 for the channel dim because we used 5 filters and 7 for the conv outputs because:
+
 # 
+
 # $\frac{W - F + 2P}{S} + 1 = \frac{8 - 2 + 2(0)}{1} + 1 = 7$
+
 # 
+
 # where:
+
 #   * W: width of each input
+
 #   * F: filter size
+
 #   * P: padding
+
 #   * S: stride
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/cnn_text3.png" width=400>
+
 # In[5]:
+
 # Convolve using filters
 conv_output = conv1(x)
 print("Size: {}".format(conv_output.shape))
+
 # # Pooling
+
 # The result of convolving filters on an input is a feature map. Due to the nature of convolution and overlaps, our feature map will have lots of redundant information. Pooling is a way to summarize a high-dimensional feature map into a lower dimensional one for simplified downstream computation. The pooling operation can be the max value, average, etc. in a certain receptive field.
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/pool.jpeg" width=450>
+
 # In[6]:
+
 # Max pooling
 kernel_size = 2
 pool1 = nn.MaxPool1d(kernel_size=kernel_size, stride=2, padding=0)
 pool_output = pool1(conv_output)
 print("Size: {}".format(pool_output.shape))
+
 # $\frac{W-F}{S} + 1 = \frac{7-2}{2} + 1 =  \text{floor }(2.5) + 1 = 3$
+
 # # CNNs on text
+
 # We're going use convolutional neural networks on text data which typically involves convolving on the character level representation of the text to capture meaningful n-grams. 
+
 # 
+
 # You can easily use this set up for [time series](https://arxiv.org/abs/1807.10707) data or [combine it](https://arxiv.org/abs/1808.04928) with other networks. For text data, we will create filters of varying kernel sizes (1,2), (1,3), and (1,4) which act as feature selectors of varying n-gram sizes. The outputs are concated and fed into a fully-connected layer for class predictions. In our example, we will be applying 1D convolutions on letter in a word. In the [embeddings notebook](https://colab.research.google.com/github/GokuMohandas/practicalAI/blob/master/notebooks/12_Embeddings.ipynb), we will apply 1D convolutions on words in a sentence.
+
 # 
+
 # **Word embeddings**: capture the temporal correlations among
+
 # adjacent tokens so that similar words have similar representations. Ex. "New Jersey" is close to "NJ" is close to "Garden State", etc.
+
 # 
+
 # **Char embeddings**: create representations that map words at a character level. Ex. "toy" and "toys" will be close to each other.
+
 # # Set up
 import os
 from argparse import Namespace
@@ -96,6 +107,7 @@ import numpy as np
 import pandas as pd
 import re
 import torch
+
 # Set Numpy and PyTorch seeds
 def set_seeds(seed, cuda):
     np.random.seed(seed)
@@ -103,11 +115,14 @@ def set_seeds(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
         
+
 # Creating directories
 def create_dirs(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+
 # In[9]:
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -127,38 +142,49 @@ args = Namespace(
     num_filters=100,
     dropout_p=0.1,
 )
+
 # Set seeds
 set_seeds(seed=args.seed, cuda=args.cuda)
+
 # Create save dir
 create_dirs(args.save_dir)
+
 # Expand filepaths
 args.vectorizer_file = os.path.join(args.save_dir, args.vectorizer_file)
 args.model_state_file = os.path.join(args.save_dir, args.model_state_file)
+
 # Check CUDA
 if not torch.cuda.is_available():
     args.cuda = False
 args.device = torch.device("cuda" if args.cuda else "cpu")
 print("Using CUDA: {}".format(args.cuda))
+
 # # Data
 import re
 import urllib
+
 # Upload data from GitHub to notebook's local drive
 url = "https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/data/surnames.csv"
 response = urllib.request.urlopen(url)
 html = response.read()
 with open(args.data_file, 'wb') as fp:
     fp.write(html)
+
 # In[12]:
+
 # Raw data
 df = pd.read_csv(args.data_file, header=0)
 df.head()
+
 # In[13]:
+
 # Split by nationality
 by_nationality = collections.defaultdict(list)
 for _, row in df.iterrows():
     by_nationality[row.nationality].append(row.to_dict())
 for nationality in by_nationality:
     print ("{0}: {1}".format(nationality, len(by_nationality[nationality])))
+
 # Create split data
 final_list = []
 for _, item_list in sorted(by_nationality.items()):
@@ -177,11 +203,15 @@ for _, item_list in sorted(by_nationality.items()):
         item['split'] = 'test'  
     # Add to final list
     final_list.extend(item_list)
+
 # In[15]:
+
 # df with split datasets
 split_df = pd.DataFrame(final_list)
 split_df["split"].value_counts()
+
 # In[18]:
+
 # Preprocessing
 def preprocess_text(text):
     text = ' '.join(word.lower() for word in text.split(" "))
@@ -191,6 +221,7 @@ def preprocess_text(text):
     
 split_df.surname = split_df.surname.apply(preprocess_text)
 split_df.head()
+
 # # Vocabulary
 class Vocabulary(object):
     def __init__(self, token_to_idx=None, add_unk=True, unk_token="<UNK>"):
@@ -236,7 +267,9 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # In[20]:
+
 # Vocabulary instance
 nationality_vocab = Vocabulary(add_unk=False)
 for index, row in df.iterrows():
@@ -245,6 +278,7 @@ print (nationality_vocab) # __str__
 index = nationality_vocab.lookup_token("English")
 print (index)
 print (nationality_vocab.lookup_index(index))
+
 # # Vectorizer
 class SurnameVectorizer(object):
     def __init__(self, surname_vocab, nationality_vocab):
@@ -285,7 +319,9 @@ class SurnameVectorizer(object):
     def to_serializable(self):
         return {'surname_vocab': self.surname_vocab.to_serializable(),
                 'nationality_vocab': self.nationality_vocab.to_serializable()}
+
 # In[22]:
+
 # Vectorizer instance
 vectorizer = SurnameVectorizer.from_dataframe(split_df)
 print (vectorizer.surname_vocab)
@@ -294,7 +330,9 @@ vectorized_surname = vectorizer.vectorize(preprocess_text("goku"))
 print (np.shape(vectorized_surname))
 print (vectorized_surname)
 print (vectorizer.unvectorize(vectorized_surname))
+
 # **Note**: Unlike the bagged ont-hot encoding method in the MLP notebook, we are able to preserve the semantic structure of the surnames. We are able to use one-hot encoding here because we are using characters but when we process text with large vocabularies, this method simply can't scale. We'll explore embedding based methods in subsequent notebooks. 
+
 # # Dataset
 from torch.utils.data import Dataset, DataLoader
 class SurnameDataset(Dataset):
@@ -358,12 +396,15 @@ class SurnameDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # In[27]:
+
 # Dataset instance
 dataset = SurnameDataset.load_dataset_and_make_vectorizer(split_df)
 print (dataset) # __str__
 print (np.shape(dataset[5]['surname'])) # __getitem__
 print (dataset.class_weights)
+
 # # Model
 import torch.nn as nn
 import torch.nn.functional as F
@@ -398,9 +439,13 @@ class SurnameModel(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 # # Training
+
 # **Padding:** the inputs in a particular batch must all have the same shape. Our vectorizer converts the tokens into a vectorizer form but in a particular batch, we can have inputs of various sizes. The solution is to determine the longest input in a particular batch and pad all the other inputs to match that length. Usually, the smaller inputs in the batch are padded with zero vectors. 
+
 # 
+
 # We do this using the pad_seq function in the Trainer class which is invoked by the collate_fn which is passed to generate_batches function in the Dataset class. Essentially, the batch generater generates samples into a batch and we use the collate_fn to determine the largest input and pad all the other inputs in the batch to get a uniform input shape.
 import torch.optim as optim
 class Trainer(object):
@@ -603,7 +648,9 @@ class Trainer(object):
         self.train_state["done_training"] = True
         with open(os.path.join(self.save_dir, "train_state.json"), "w") as fp:
             json.dump(self.train_state, fp)
+
 # In[33]:
+
 # Initialization
 dataset = SurnameDataset.load_dataset_and_make_vectorizer(split_df)
 dataset.save_vectorizer(args.vectorizer_file)
@@ -613,7 +660,9 @@ model = SurnameModel(num_input_channels=len(vectorizer.surname_vocab),
                      num_classes=len(vectorizer.nationality_vocab),
                      dropout_p=args.dropout_p)
 print (model.named_modules)
+
 # In[34]:
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -622,16 +671,22 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # In[35]:
+
 # Plot performance
 trainer.plot_performance()
+
 # In[36]:
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # # Inference
 class Inference(object):
     def __init__(self, model, vectorizer, device="cpu"):
@@ -658,10 +713,13 @@ class Inference(object):
                 nationality = self.vectorizer.nationality_vocab.lookup_index(index)
                 results.append({'nationality': nationality, 'probability': probability})
         return results
+
 # Load vectorizer
 with open(args.vectorizer_file) as fp:
     vectorizer = SurnameVectorizer.from_serializable(json.load(fp))
+
 # In[43]:
+
 # Load the model
 model = SurnameModel(num_input_channels=len(vectorizer.surname_vocab),
                      num_output_channels=args.num_filters,
@@ -669,6 +727,7 @@ model = SurnameModel(num_input_channels=len(vectorizer.surname_vocab),
                      dropout_p=args.dropout_p)
 model.load_state_dict(torch.load(args.model_state_file))
 print (model.named_modules)
+
 # Initialize
 inference = Inference(model=model, vectorizer=vectorizer, device=args.device)
 class InferenceDataset(Dataset):
@@ -694,7 +753,9 @@ class InferenceDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # In[46]:
+
 # Inference
 surname = input("Enter a surname to classify: ")
 infer_df = pd.DataFrame([surname], columns=['surname'])
@@ -702,23 +763,41 @@ infer_df.surname = infer_df.surname.apply(preprocess_text)
 infer_dataset = InferenceDataset(infer_df, vectorizer)
 results = inference.predict_nationality(dataset=infer_dataset)
 results
+
 # # Batch normalization
+
 # Even though we standardized our inputs to have zero mean and unit variance to aid with convergence, our inputs change during training as they go through the different layers and nonlinearities. This is known as internal covariate shirt and it slows down training and requires us to use smaller learning rates. The solution is [batch normalization](https://arxiv.org/abs/1502.03167) (batchnorm) which makes normalization a part of the model's architecture. This allows us to use much higher learning rates and get better performance, faster.
+
 # 
+
 # $ BN = \frac{a - \mu_{x}}{\sqrt{\sigma^2_{x} + \epsilon}}  * \gamma + \beta $
+
 # 
+
 # where:
+
 # * $a$ = activation | $\in \mathbb{R}^{NXH}$ ($N$ is the number of samples, $H$ is the hidden dim)
+
 # * $ \mu_{x}$ = mean of each hidden | $\in \mathbb{R}^{1XH}$
+
 # * $\sigma^2_{x}$ = variance of each hidden | $\in \mathbb{R}^{1XH}$
+
 # * $epsilon$ = noise
+
 # * $\gamma$ = scale parameter (learned parameter)
+
 # * $\beta$ = shift parameter (learned parameter)
+
 # 
+
 # 
+
 # But what does it mean for our activations to have zero mean and unit variance before the nonlinearity operation. It doesn't mean that the entire activation matrix has this property but instead batchnorm is applied on the hidden (num_output_channels in our case) dimension. So each hidden's mean and variance is calculated using all samples across the batch. Also, batchnorm uses the calcualted mean and variance of the activations in the batch during training. However, during test, the sample size could be skewed so the model uses the saved population mean and variance from training. PyTorch's [BatchNorm](https://pytorch.org/docs/stable/nn.html#torch.nn.BatchNorm1d) class takes care of all of this for us automatically.
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/batchnorm.png" width=400>
+
 # Model with batch normalization
 class SurnameModel_BN(nn.Module):
     def __init__(self, num_input_channels, num_output_channels, num_classes, dropout_p):
@@ -752,7 +831,9 @@ class SurnameModel_BN(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 # In[50]:
+
 # Initialization
 dataset = SurnameDataset.load_dataset_and_make_vectorizer(split_df)
 dataset.save_vectorizer(args.vectorizer_file)
@@ -762,8 +843,11 @@ model = SurnameModel_BN(num_input_channels=len(vectorizer.surname_vocab),
                         num_classes=len(vectorizer.nationality_vocab),
                         dropout_p=args.dropout_p)
 print (model.named_modules)
+
 # You can train this model with batch normalization and you'll notice that the validation results improve by ~2-5%.
+
 # In[51]:
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -772,20 +856,33 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # In[52]:
+
 # Plot performance
 trainer.plot_performance()
+
 # In[53]:
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # # TODO
+
 # * image classification example
+
 # * segmentation
+
 # * deep CNN architectures
+
 # * small 3X3 filters
+
 # * details on padding and stride (control receptive field, make every pixel the center of the filter, etc.)
+
 # * network-in-network (1x1 conv)
+
 # * residual connections / residual block
+
 # * interpretability (which n-grams fire)

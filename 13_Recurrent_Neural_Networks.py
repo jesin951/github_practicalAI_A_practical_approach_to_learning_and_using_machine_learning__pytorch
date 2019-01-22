@@ -1,48 +1,3 @@
-
-# coding: utf-8
-# # Recurrent Neural Networks
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
-# 
-# When working with sequential data (time-series, sentences, etc.) the order of the inputs is crucial for the task at hand. Recurrent neural networks (RNNs) process sequential data by accounting for the current input and also what has been learned from previous inputs. In this notebook, we'll learn how to create and train RNNs on sequential data.
-# 
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/rnn.png" width=550>
-# 
-# 
-# 
-# # Overview
-# * **Objective:**  Process sequential data by accounting for the currend input and also what has been learned from previous inputs.
-# * **Advantages:** 
-#     * Account for order and previous inputs in a meaningful way.
-#     * Conditioned generation for generating sequences.
-# * **Disadvantages:** 
-#     * Each time step's prediction depends on the previous prediction so it's difficult to parallelize RNN operations. 
-#     * Processing long sequences can yield memory and computation issues.
-#     * Interpretability is difficult but there are few [techniques](https://arxiv.org/abs/1506.02078) that use the activations from RNNs to see what parts of the inputs are processed. 
-# * **Miscellaneous:** 
-#     * Architectural tweaks to make RNNs faster and interpretable is an ongoing area of research.
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/rnn2.png" width=650>
-# 
-# RNN forward pass for a single time step $X_t$:
-# 
-# $h_t = tanh(W_{hh}h_{t-1} + W_{xh}X_t+b_h)$
-# 
-# $y_t = W_{hy}h_t + b_y $
-# 
-# $ P(y) = softmax(y_t) = \frac{e^y}{\sum e^y} $
-# 
-# *where*:
-# * $X_t$ = input at time step t | $\in \mathbb{R}^{NXE}$ ($N$ is the batch size, $E$ is the embedding dim)
-# * $W_{hh}$ = hidden units weights| $\in \mathbb{R}^{HXH}$ ($H$ is the hidden dim)
-# * $h_{t-1}$ = previous timestep's hidden state $\in \mathbb{R}^{NXH}$
-# * $W_{xh}$ = input weights| $\in \mathbb{R}^{EXH}$
-# * $b_h$ = hidden units bias $\in \mathbb{R}^{HX1}$
-# * $W_{hy}$ = output weights| $\in \mathbb{R}^{HXC}$ ($C$ is the number of classes)
-# * $b_y$ = output bias $\in \mathbb{R}^{CX1}$
-# 
-# You repeat this for every time step's input ($X_{t+1}, X_{t+2}, ..., X_{N})$ to the get the predicted outputs at each time step.
-# 
-# **Note**: At the first time step, the previous hidden state $h_{t-1}$ can either be a zero vector (unconditioned) or initialize (conditioned). If we are conditioning the RNN, the first hidden state $h_0$ can belong to a specific condition or we can concat the specific condition to the randomly initialized hidden vectors at each time step. More on this in the subsequent notebooks on RNNs.
-# Let's see what the forward pass looks like with an RNN for a synthetic task such as processing reviews (a sequence of words) to predict the sentiment at the end of processing the review.
 # Load PyTorch library
 
 import torch
@@ -54,18 +9,23 @@ x_lengths = [8, 5, 4, 10, 5] # lengths of each input sequence
 embedding_dim = 100
 rnn_hidden_dim = 256
 output_dim = 4
+
 # Initialize synthetic inputs
 x_in = torch.randn(batch_size, seq_size, embedding_dim)
 x_lengths = torch.tensor(x_lengths)
 print (x_in.size())
+
 # Initialize hidden state
 hidden_t = torch.zeros((batch_size, rnn_hidden_dim))
 print (hidden_t.size())
+
 # Initialize RNN cell
 rnn_cell = nn.RNNCell(embedding_dim, rnn_hidden_dim)
 print (rnn_cell)
+
 # Forward pass through RNN
 x_in = x_in.permute(1, 0, 2) # RNN needs batch_size to be at dim 1
+
 # Loop through the inputs time steps
 hiddens = []
 for t in range(seq_size):
@@ -74,6 +34,7 @@ for t in range(seq_size):
 hiddens = torch.stack(hiddens)
 hiddens = hiddens.permute(1, 0, 2) # bring batch_size back to dim 0
 print (hiddens.size())
+
 # We also could've used a more abstracted layer
 x_in = torch.randn(batch_size, seq_size, embedding_dim)
 rnn = nn.RNN(embedding_dim, rnn_hidden_dim, batch_first=True)
@@ -86,64 +47,104 @@ def gather_last_relevant_hidden(hiddens, x_lengths):
     for batch_index, column_index in enumerate(x_lengths):
         out.append(hiddens[batch_index, column_index])
     return torch.stack(out)
+
 # Gather the last relevant hidden state
 z = gather_last_relevant_hidden(hiddens, x_lengths)
 print (z.size())
+
 # Forward pass through FC layer
 fc1 = nn.Linear(rnn_hidden_dim, output_dim)
 y_pred = fc1(z)
 y_pred = F.softmax(y_pred, dim=1)
 print (y_pred.size())
 print (y_pred)
+
 # # Sequential data
+
 # There are a variety of different sequential tasks that RNNs can help with.
+
 # 
+
 # 1. **One to one**: there is one input and produces one output. 
+
 #     * Ex. Given a word predict it's class (verb, noun, etc.).
+
 # 2. **One to many**: one input generates many outputs.
+
 #     * Ex. Given a sentiment (positive, negative, etc.) generate a review.
+
 # 3. **Many to one**: Many inputs are sequentially processed to generate one output.
+
 #     * Ex. Process the words in a review to predict the sentiment.
+
 # 4. **Many to many**: Many inputs are sequentially processed to generate many outputs.
+
 #     * Ex. Given a sentence in French, processes the entire sentence and then generate the English translation.
+
 #     * Ex. Given a sequence of time-series data, predict the probability of an event (risk of disease) at each time step.
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/seq2seq.jpeg" width=700>
+
 # # Issues with vanilla RNNs
+
 # There are several issues with the vanilla RNN that we've seen so far. 
+
 # 
+
 # 1. When we have an input sequence that has many time steps, it becomes difficult for the model to retain information seen earlier as we process more and more of the downstream timesteps. The goals of the model is to retain the useful components in the previously seen time steps but this becomes cumbersome when we have so many time steps to process. 
+
 # 
+
 # 2. During backpropagation, the gradient from the loss has to travel all the way back towards the first time step. If our gradient is larger than 1 (${1.01}^{1000} = 20959$) or less than 1 (${0.99}^{1000} = 4.31e-5$) and we have lot's of time steps, this can quickly spiral out of control.
+
 # 
+
 # To address both these issues, the concept of gating was introduced to RNNs. Gating allows RNNs to control the information flow between each time step to optimize on the task. Selectively allowing information to pass through allows the model to process inputs with many time steps. The most common RNN gated varients are the long short term memory ([LSTM](https://pytorch.org/docs/stable/nn.html#torch.nn.LSTM)) units and gated recurrent units ([GRUs](https://pytorch.org/docs/stable/nn.html#torch.nn.GRU)). You can read more about how these units work [here](http://colah.github.io/posts/2015-08-Understanding-LSTMs/).
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/gates.png" width=900>
+
 # GRU in PyTorch
 gru = nn.GRU(input_size=embedding_dim, hidden_size=rnn_hidden_dim, 
              batch_first=True)
+
 # Initialize synthetic input
 x_in = torch.randn(batch_size, seq_size, embedding_dim)
 print (x_in.size())
+
 # Forward pass
 out, h_n = gru(x_in)
 print ("out:", out.size())
 print ("h_n:", h_n.size())
+
 # **Note**: Choosing whether to use GRU or LSTM really depends on the data and empirical performance. GRUs offer comparable performance with reduce number of parameters while LSTMs are more efficient and may make the difference in performance for your particular task.
+
 # # Bidirectional RNNs
+
 # There have been many advancements with RNNs ([attention](https://www.oreilly.com/ideas/interpretability-via-attentional-and-memory-based-interfaces-using-tensorflow), Quasi RNNs, etc.) that we will cover in later lessons but one of the basic and widely used ones are bidirectional RNNs (Bi-RNNs). The motivation behind bidirectional RNNs is to process an input sequence by both directions. Accounting for context from both sides can aid in performance when the entire input sequence is known at time of inference. A common application of Bi-RNNs is in translation where it's advantageous to look at an entire sentence from both sides when translating to another language (ie. Japanese → English).
+
 # 
+
 # <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/birnn.png" width=700>
+
 # BiGRU in PyTorch
 bi_gru = nn.GRU(input_size=embedding_dim, hidden_size=rnn_hidden_dim, 
                 batch_first=True, bidirectional=True)
+
 # Forward pass
 out, h_n = bi_gru(x_in)
 print ("out:", out.size()) # collection of all hidden states from the RNN for each time step
 print ("h_n:", h_n.size()) # last hidden state from the RNN
+
 # Notice that the output for each sample at each timestamp has size 512 (double the hidden dim). This is because this includes both the forward and backward directions from the BiRNN. 
+
 # # Document classification with RNNs
+
 # Let's apply RNNs to the document classification task from the [emebddings notebook](https://colab.research.google.com/drive/1yDa5ZTqKVoLl-qRgH-N9xs3pdrDJ0Fb4) where we want to predict an article's category given its title.
+
 # ## Set up
 import os
 from argparse import Namespace
@@ -155,6 +156,7 @@ import numpy as np
 import pandas as pd
 import re
 import torch
+
 # Set Numpy and PyTorch seeds
 def set_seeds(seed, cuda):
     np.random.seed(seed)
@@ -162,10 +164,12 @@ def set_seeds(seed, cuda):
     if cuda:
         torch.cuda.manual_seed_all(seed)
         
+
 # Creating directories
 def create_dirs(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -191,36 +195,45 @@ args = Namespace(
     bidirectional=False,
     dropout_p=0.1,
 )
+
 # Set seeds
 set_seeds(seed=args.seed, cuda=args.cuda)
+
 # Create save dir
 create_dirs(args.save_dir)
+
 # Expand filepaths
 args.vectorizer_file = os.path.join(args.save_dir, args.vectorizer_file)
 args.model_state_file = os.path.join(args.save_dir, args.model_state_file)
+
 # Check CUDA
 if not torch.cuda.is_available():
     args.cuda = False
 args.device = torch.device("cuda" if args.cuda else "cpu")
 print("Using CUDA: {}".format(args.cuda))
+
 # ## Data
 import re
 import urllib
+
 # Upload data from GitHub to notebook's local drive
 url = "https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/data/news.csv"
 response = urllib.request.urlopen(url)
 html = response.read()
 with open(args.data_file, 'wb') as fp:
     fp.write(html)
+
 # Raw data
 df = pd.read_csv(args.data_file, header=0)
 df.head()
+
 # Split by category
 by_category = collections.defaultdict(list)
 for _, row in df.iterrows():
     by_category[row.category].append(row.to_dict())
 for category in by_category:
     print ("{0}: {1}".format(category, len(by_category[category])))
+
 # Create split data
 final_list = []
 for _, item_list in sorted(by_category.items()):
@@ -239,9 +252,11 @@ for _, item_list in sorted(by_category.items()):
         item['split'] = 'test'  
     # Add to final list
     final_list.extend(item_list)
+
 # df with split datasets
 split_df = pd.DataFrame(final_list)
 split_df["split"].value_counts()
+
 # Preprocessing
 def preprocess_text(text):
     text = ' '.join(word.lower() for word in text.split(" "))
@@ -252,6 +267,7 @@ def preprocess_text(text):
     
 split_df.title = split_df.title.apply(preprocess_text)
 split_df.head()
+
 # ## Vocabulary
 class Vocabulary(object):
     def __init__(self, token_to_idx=None):
@@ -286,6 +302,7 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # Vocabulary instance
 category_vocab = Vocabulary()
 for index, row in df.iterrows():
@@ -295,7 +312,9 @@ print (len(category_vocab)) # __len__
 index = category_vocab.lookup_token("Business")
 print (index)
 print (category_vocab.lookup_index(index))
+
 # ## Sequence vocabulary
+
 # Next, we're going to create our Vocabulary classes for the article's title, which is a sequence of tokens.
 from collections import Counter
 import string
@@ -334,12 +353,14 @@ class SequenceVocabulary(Vocabulary):
         return "<SequenceVocabulary(size=%d)>" % len(self.token_to_idx)
     def __len__(self):
         return len(self.token_to_idx)
+
 # Get word counts
 word_counts = Counter()
 for title in split_df.title:
     for token in title.split(" "):
         if token not in string.punctuation:
             word_counts[token] += 1
+
 # Create SequenceVocabulary instance
 title_vocab = SequenceVocabulary()
 for word, word_count in word_counts.items():
@@ -350,7 +371,9 @@ print (len(title_vocab)) # __len__
 index = title_vocab.lookup_token("general")
 print (index)
 print (title_vocab.lookup_index(index))
+
 # ## Vectorizer
+
 # Something new that we introduce in this Vectorizer is calculating the length of our input sequence. We will use this later on to extract the last relevant hidden state for each input sequence.
 class NewsVectorizer(object):
     def __init__(self, title_vocab, category_vocab):
@@ -399,6 +422,7 @@ class NewsVectorizer(object):
     def to_serializable(self):
         return {'title_vocab': self.title_vocab.to_serializable(),
                 'category_vocab': self.category_vocab.to_serializable()}
+
 # Vectorizer instance
 vectorizer = NewsVectorizer.from_dataframe(split_df, cutoff=args.cutoff)
 print (vectorizer.title_vocab)
@@ -409,6 +433,7 @@ print (np.shape(vectorized_title))
 print ("title_length:", title_length)
 print (vectorized_title)
 print (vectorizer.unvectorize(vectorized_title))
+
 # ## Dataset
 from torch.utils.data import Dataset, DataLoader
 class NewsDataset(Dataset):
@@ -473,6 +498,7 @@ class NewsDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # Dataset instance
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df,
                                                        cutoff=args.cutoff)
@@ -481,7 +507,9 @@ input_ = dataset[5] # __getitem__
 print (input_['title'], input_['title_length'], input_['category'])
 print (dataset.vectorizer.unvectorize(input_['title']))
 print (dataset.class_weights)
+
 # ## Model
+
 # input → embedding → RNN → FC 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -539,6 +567,7 @@ class NewsModel(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 # ## Training
 import torch.optim as optim
 class Trainer(object):
@@ -742,6 +771,7 @@ class Trainer(object):
         self.train_state["done_training"] = True
         with open(os.path.join(self.save_dir, "train_state.json"), "w") as fp:
             json.dump(self.train_state, fp)
+
 # Initialization
 dataset = NewsDataset.load_dataset_and_make_vectorizer(df=split_df,
                                                        cutoff=args.cutoff)
@@ -758,6 +788,7 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   pretrained_embeddings=None, 
                   padding_idx=vectorizer.title_vocab.mask_index)
 print (model.named_modules)
+
 # Train
 trainer = Trainer(dataset=dataset, model=model, 
                   model_state_file=args.model_state_file, 
@@ -766,14 +797,18 @@ trainer = Trainer(dataset=dataset, model=model,
                   batch_size=args.batch_size, learning_rate=args.learning_rate, 
                   early_stopping_criteria=args.early_stopping_criteria)
 trainer.run_train_loop()
+
 # Plot performance
 trainer.plot_performance()
+
 # Test performance
 trainer.run_test_loop()
 print("Test loss: {0:.2f}".format(trainer.train_state['test_loss']))
 print("Test Accuracy: {0:.1f}%".format(trainer.train_state['test_acc']))
+
 # Save all results
 trainer.save_train_state()
+
 # ## Inference
 class Inference(object):
     def __init__(self, model, vectorizer, device="cpu"):
@@ -801,9 +836,11 @@ class Inference(object):
                 category = self.vectorizer.category_vocab.lookup_index(index)
                 results.append({'category': category, 'probability': probability})
         return results
+
 # Load vectorizer
 with open(args.vectorizer_file) as fp:
     vectorizer = NewsVectorizer.from_serializable(json.load(fp))
+
 # Load the model
 model = NewsModel(embedding_dim=args.embedding_dim, 
                   num_embeddings=len(vectorizer.title_vocab), 
@@ -817,6 +854,7 @@ model = NewsModel(embedding_dim=args.embedding_dim,
                   padding_idx=vectorizer.title_vocab.mask_index)
 model.load_state_dict(torch.load(args.model_state_file))
 print (model.named_modules)
+
 # Initialize
 inference = Inference(model=model, vectorizer=vectorizer, device=args.device)
 class InferenceDataset(Dataset):
@@ -842,6 +880,7 @@ class InferenceDataset(Dataset):
             for name, tensor in data_dict.items():
                 out_data_dict[name] = data_dict[name].to(device)
             yield out_data_dict
+
 # Inference
 title = input("Enter a title to classify: ")
 infer_df = pd.DataFrame([title], columns=['title'])
@@ -849,5 +888,7 @@ infer_df.title = infer_df.title.apply(preprocess_text)
 infer_dataset = InferenceDataset(infer_df, vectorizer)
 results = inference.predict_category(dataset=infer_dataset)
 results
+
 # # TODO
+
 # - interpretability with task to see which words were most influential

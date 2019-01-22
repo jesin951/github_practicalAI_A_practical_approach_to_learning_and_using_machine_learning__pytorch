@@ -1,24 +1,10 @@
 
-# coding: utf-8
-# # Object Oriented ML
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/logo.png" width=150>
-# 
-# In this notebook, we will learn how to properly create and use classes & functions to solve ML tasks with PyTorch. We will be following this implementation structure in subsequent notebooks.
-# 
-# 
-# 
-# 
-# # Overview
-# Here is the overview of the different classes and the functionality they will have.
-# *   **Vocabulary**: dictionaries to convert between raw inputs and numerical form. Usually useful for NLP tasks to build and store vocabulary dictionaries.
-# *   **Vectorizer**: instances of the vocabulary class for inputs and outputs and vectorizes the data for the model.
-# *   **Dataset**: vectorizers to process the data and data splits.
-# *   **Model**: PyTorch model to process inputs and return predictions.
-# * **Trainer**: training operations using the dataset, vectorizer and model.
-# * **Inference**: inference operations for new data
-# 
+#
+
 # Credit for the code structure in the implementations below and in subsequent lessons goes to these [contributors](https://github.com/joosthub/PyTorchNLPBook/graphs/contributors).
+
 # # Configuration
+
 # We will be using these configurations throughout the notebook for our task of predicting nationality given a surname.
 config = {
   "seed": 1234,
@@ -41,8 +27,11 @@ config = {
     "dropout_p": 0.1
   }
 }
+
 # # Set up
+
 # We're going to get set up for our task by setting reproducability seeds with NumPy and PyTorch. We will also create a unique directory to store our configurations, model, etc.
+
 # Load PyTorch library
 
 import os
@@ -51,6 +40,7 @@ import numpy as np
 import time
 import torch
 import uuid
+
 # ### Components
 def set_seeds(seed, cuda):
     """ Set Numpy and PyTorch seeds.
@@ -82,30 +72,40 @@ def check_cuda(cuda):
     device = torch.device("cuda" if cuda else "cpu")
     print ("==> 💻 Device: {0}".format(device))
     return device
+
 # ### Operations
+
 # Set seeds for reproducability
 set_seeds(seed=config["seed"], cuda=config["cuda"])
+
 # Generate unique experiment ID
 config["experiment_id"] = generate_unique_id()
+
 # Create experiment directory
 config["save_dir"] = os.path.join(config["save_dir"], config["experiment_id"])
 create_dirs(dirpath=config["save_dir"])
+
 # Expand file paths to store components later
 config["vectorizer_file"] = os.path.join(config["save_dir"], config["vectorizer_file"])
 config["model_file"] = os.path.join(config["save_dir"], config["model_file"])
 print ("Expanded filepaths: ")
 print ("{}".format(config["vectorizer_file"]))
 print ("{}".format(config["model_file"]))
+
 # Save config
 config_fp = os.path.join(config["save_dir"], "config.json")
 with open(config_fp, "w") as fp:
     json.dump(config, fp)
+
 # Check CUDA
 config["device"] = check_cuda(cuda=config["cuda"])
+
 # # Load data
+
 # Get the data from the GitHub URL and then load it into a Pandas DataFrame.
 import pandas as pd
 import urllib
+
 # ### Components
 def get_data(data_url, data_file):
     """Get data from GitHub to notebook's
@@ -129,14 +129,20 @@ def load_data(data_file):
     print ("==> 🍣 Raw data:")
     print (df.head())
     return df
+
 # ### Operations
+
 # Get data from GitHub
 get_data(data_url=config["data_url"], data_file=config["data_file"])
+
 # Load data into Pandas DataFrame
 df = load_data(data_file=config["data_file"])
+
 # # Split data
+
 # Split the data into train, validation and test sets where each split has similar class distributions. 
 import collections
+
 # ### Components
 def split_data(df, shuffle, train_size, val_size, test_size):
     """Split the data into train/val/test splits.
@@ -171,16 +177,21 @@ def split_data(df, shuffle, train_size, val_size, test_size):
     print ("\n==> 🖖 Splits:")
     print (split_df["split"].value_counts())
     return split_df
+
 # ### Operations
+
 # Split data
 split_df = split_data(
     df=df, shuffle=config["shuffle"],
     train_size=config["train_size"],
     val_size=config["val_size"],
     test_size=config["test_size"])
+
 # # Preprocessing
+
 # Preprocess the data in the DataFrame.
 import re
+
 # ### Components
 def preprocess_text(text):
     """Basic text preprocessing.
@@ -197,11 +208,16 @@ def preprocess_data(df):
     print ("\n==> 🚿 Preprocessing:")
     print (df.head())
     return df
+
 # ### Operations
+
 # Preprocessing
 preprocessed_df = preprocess_data(split_df)
+
 # # Vocabulary
+
 # Create vocabularies for the surnames and nationality classes.
+
 # ### Components
 class Vocabulary(object):
     def __init__(self, token_to_idx=None, add_unk=True, unk_token="<UNK>"):
@@ -247,7 +263,9 @@ class Vocabulary(object):
         return "<Vocabulary(size=%d)>" % len(self)
     def __len__(self):
         return len(self.token_to_idx)
+
 # ### Operations
+
 # Vocabulary instance
 nationality_vocab = Vocabulary(add_unk=False)
 for index, row in preprocessed_df.iterrows():
@@ -257,8 +275,11 @@ print (len(nationality_vocab)) # __len__
 index = nationality_vocab.lookup_token("English")
 print (index)
 print (nationality_vocab.lookup_index(index))
+
 # # Vectorizer
+
 # Vectorizes our data into numerical form using the vocabularies.
+
 # ### Components
 class SurnameVectorizer(object):
     def __init__(self, surname_vocab, nationality_vocab):
@@ -291,7 +312,9 @@ class SurnameVectorizer(object):
     def to_serializable(self):
         return {'surname_vocab': self.surname_vocab.to_serializable(),
                 'nationality_vocab': self.nationality_vocab.to_serializable()}
+
 # ### Operations
+
 # Vectorizer instance
 vectorizer = SurnameVectorizer.from_dataframe(preprocessed_df)
 print (vectorizer.surname_vocab)
@@ -299,11 +322,15 @@ print (vectorizer.nationality_vocab)
 one_hot = vectorizer.vectorize(preprocess_text("goku"))
 print (one_hot)
 print (vectorizer.unvectorize(one_hot))
+
 # **Note**: When we vectorize our input with bagged one hot encoded format, we lose all the structure in our name. This is a major disadvantage of representing our text in bagged one-hot encoded form but we will explore more semantic structure preserving encoding methods later.
+
 # # Dataset
+
 # The Dataset will create vectorized data from the preprocessed data.
 import random
 from torch.utils.data import Dataset, DataLoader
+
 # ### Components
 class SurnameDataset(Dataset):
     def __init__(self, df, vectorizer, infer=False):
@@ -382,18 +409,24 @@ def sample(dataset):
         dataset.vectorizer.unvectorize(sample['surname'])))
     print ("Unvectorized nationality: {0}".format(
         dataset.vectorizer.nationality_vocab.lookup_index(sample['nationality'])))
+
 # ### Operations
+
 # Load dataset and vectorizer
 dataset = SurnameDataset.load_dataset_and_make_vectorizer(preprocessed_df)
 dataset.save_vectorizer(config["vectorizer_file"])
 vectorizer = dataset.vectorizer
 print (dataset.class_weights)
+
 # Sample checks
 sample(dataset=dataset)
+
 # # Model
+
 # Basic MLP architecture for surname classification.
 import torch.nn as nn
 import torch.nn.functional as F
+
 # ### Components
 class SurnameModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout_p):
@@ -419,13 +452,18 @@ def initialize_model(config, vectorizer):
         dropout_p=config["fc"]["dropout_p"])
     print (model.named_modules)
     return model
+
 # ### Operations
+
 # Initializing model
 model = initialize_model(config=config, vectorizer=vectorizer)
+
 # # Training
+
 # Training operations for surname classification.
 import matplotlib.pyplot as plt
 import torch.optim as optim
+
 # ### Components
 def compute_accuracy(y_pred, y_target):
     _, y_pred_indices = y_pred.max(dim=1)
@@ -601,7 +639,9 @@ def save_train_state(train_state, save_dir):
     with open(os.path.join(save_dir, "train_state.json"), "w") as fp:
         json.dump(train_state, fp)
     print ("==> ✅ Training complete!")
+
 # ### Operations
+
 # Training
 trainer = Trainer(
     dataset=dataset, model=model, model_file=config["model_file"],
@@ -610,15 +650,21 @@ trainer = Trainer(
     learning_rate=config["learning_rate"], 
     early_stopping_criteria=config["early_stopping_criteria"])
 trainer.run_train_loop()
+
 # Plot performance
 plot_performance(train_state=trainer.train_state, 
                  save_dir=config["save_dir"], show_plot=True)
+
 # Test performance
 trainer.run_test_loop()
+
 # Save all results
 save_train_state(train_state=trainer.train_state, save_dir=config["save_dir"])
+
 # # Inference
+
 # Components to see how our trained model fares against unseen surnames.
+
 # ### Components
 class Inference(object):
     def __init__(self, model, vectorizer, device="cpu"):
@@ -645,15 +691,20 @@ class Inference(object):
                 nationality = self.vectorizer.nationality_vocab.lookup_index(index)
                 results.append({'nationality': nationality, 'probability': probability})
         return results
+
 # ### Operations
+
 # Load vectorizer
 with open(config["vectorizer_file"]) as fp:
     vectorizer = SurnameVectorizer.from_serializable(json.load(fp))
+
 # Load the model
 model = initialize_model(config=config, vectorizer=vectorizer)
 model.load_state_dict(torch.load(config["model_file"]))
+
 # Initialize
 inference = Inference(model=model, vectorizer=vectorizer, device=config["device"])
+
 # Inference
 surname = input("Enter a surname to classify: ")
 nationality = list(vectorizer.nationality_vocab.token_to_idx.keys())[0] # random filler nationality
@@ -662,5 +713,7 @@ infer_df.surname = infer_df.surname.apply(preprocess_text)
 infer_dataset = SurnameDataset(df=infer_df, vectorizer=vectorizer, infer=True)
 results = inference.predict_nationality(dataset=infer_dataset)
 results
+
 # # TODO
+
 # - tqdm notebook
