@@ -5,7 +5,7 @@ venv/
 ~*
 tf_logs/
 dqn/
-
+log/
 
 **/*.pyc
 .idea/*.*

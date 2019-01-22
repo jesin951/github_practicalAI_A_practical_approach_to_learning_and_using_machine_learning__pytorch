@@ -52,7 +52,7 @@
 # 
 # We can learn embeddings using any of these approaches above and some work better than others. You can inspect the learned embeddings but the best way to choose an approach is to empirically validate the performance on a supervised task. We can learn embeddings by creating our models in PyTorch but instead, we're going to use a library that specializes in embeddings and topic modeling called [Gensim](https://radimrehurek.com/gensim/). 
 # In[1]:
-get_ipython().system('pip install gensim ')
+# get_ipython().system('pip install gensim ')
 # In[2]:
 import os
 from argparse import Namespace

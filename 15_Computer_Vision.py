@@ -696,7 +696,7 @@ save_train_state(train_state=trainer.train_state, save_dir=config["save_dir"])
 # In this section, we're going to use a pretrained model that performs very well on a different dataset. We're going to take the architecture and the initial convolutional weights from the model to use on our data. We will freeze the initial convolutional weights and fine tune the later convolutional and fully-connected layers. 
 # 
 # Transfer learning works here because the initial convolution layers act as excellent feature extractors for common spatial features that are shared across images regardless of their class. We're going to leverage these large, pretrained models' feature extractors for our own dataset.
-get_ipython().system('pip install torchvision')
+# get_ipython().system('pip install torchvision')
 from torchvision import models
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
