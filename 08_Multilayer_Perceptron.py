@@ -128,9 +128,8 @@ for t in range(args.num_epochs):
     accuracy = get_accuracy(y_pred=predictions.long(), y_target=y_train)
     # Loss
     loss = loss_fn(y_pred, y_train)
-    
-    # Verbose
-    if t%20==0: 
+
+    if t%20==0: # Verbose
         print ("epoch: {0:02d} | loss: {1:.4f} | acc: {2:.1f}%".format(
             t, loss, accuracy))
     # Zero all gradients
@@ -208,10 +207,15 @@ print (classification_report(y_test, pred_test))
 
 
 
+
+
+
 ############################################################################################
-# # Linear model
+############################################################################################
 # # Non-linear model
-# Now let's see how the MLP performs on the data. Note that the only difference is the addition of the non-linear activation function (we use ReLU which is just $max(0, z))$. 
+############################################################################################
+
+# Now let's see how the MLP performs on the data. Note that the only difference is the addition of the non-linear activation function (we use ReLU which is just $max(0, z))$.
 # Multilayer Perceptron 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
@@ -301,32 +305,25 @@ print (classification_report(y_test, pred_test))
 
 LOG_DIR = './log'
 run_num = 0
-# get_ipython().system_raw( 'tensorboard --logdir {} --host 0.0.0.0 --port 6006 &' .format(LOG_DIR) )
-# Install localtunnel
-# get_ipython().system('npm install -g localtunnel')
-# Tunnel port 6006 for tensorboard
-# get_ipython().system_raw('lt --port 6006 >> tensorboard.txt 2>&1 &')
-# Now let's train our model and see some visualizations on our tensorboard.
-# Few things needed to get tensorboard working
 from tensorboardX import SummaryWriter
-import torchvision.utils as vutils
-# get_ipython().system('pip install Pillow==4.0.0')
-# get_ipython().system('pip install PIL')
-# get_ipython().system('pip install image')
-from PIL import Image
+# from PIL import Image
+import image as Image
 def register_extension(id, extension): Image.EXTENSION[extension.lower()] = id.upper()
 Image.register_extension = register_extension
 def register_extensions(id, extensions): 
     for extension in extensions: register_extension(id, extension)
 Image.register_extensions = register_extensions
+
 # Initialize the Tensorboard writer
 run_num += 1
 writer = SummaryWriter(log_dir=LOG_DIR+"/run_{}".format(run_num))
+
 # Initialize model
 model = MLP(input_dim=args.dimensions, 
             hidden_dim=args.num_hidden_units, 
             output_dim=args.num_classes)
 print (model.named_modules)
+
 # Optimization
 loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -344,6 +341,8 @@ def write_weights(writer, model, epoch_num):
        # Weights histogram (dim over 1024 cause an error)
        if len(param.size()) > 1 and param.size()[-1] <= 1024: 
            writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch_num)
+
+
 # Training
 for t in range(args.num_epochs):
     # Forward pass
@@ -371,6 +370,7 @@ for t in range(args.num_epochs):
     writer.add_scalar('metrics/train_acc', accuracy, t)
     writer.add_scalar('metrics/lr', optimizer.param_groups[0]['lr'], t)
     write_weights(writer=writer, model=model, epoch_num=t)
+
 print ("Go to this link below to see the Tensorboard:")
 # get_ipython().system('cat tensorboard.txt')
 print ("Click on SCALARS to see metrics and DISTRIBUTIONS to see weights.")
@@ -379,9 +379,11 @@ print ("Click on SCALARS to see metrics and DISTRIBUTIONS to see weights.")
 
 
 ############################################################################################
-# # Linear model
+############################################################################################
 # # Activation functions
-# In our MLP, we used the ReLU activation function ($max(0,z)$) which is by far the most widely use option. But there are several other options for activation functions as well, each with their own unique properties. 
+############################################################################################
+
+# In our MLP, we used the ReLU activation function ($max(0,z)$) which is by far the most widely use option. But there are several other options for activation functions as well, each with their own unique properties.
 # Fig size
 plt.figure(figsize=(12,3))
 # Data
@@ -408,21 +410,23 @@ plt.show()
 
 
 ############################################################################################
-# # Linear model
 # # Initializing weights
+############################################################################################
+
 # So far we have been initializing weights with small random values and this isn't optimal for convergence during training. The objective is to have weights that are able to produce outputs that follow a similar distribution across all neurons. We can do this by enforcing weights to have unit variance prior the affine and non-linear operations.
-# 
 # A popular method is to apply [xavier initialization](http://andyljones.tumblr.com/post/110998971763/an-explanation-of-xavier-initialization), which essentially initializes the weights to allow the signal from the data to each deep into the network. We're going to use this in our models with PyTorch.
-# 
 # You may be wondering why we don't do this for every forward pass and that's a great question. We'll look at more advanced strategies that help with optimization like batch/layer normalization, etc. in future lessons.
+
 # Multilayer Perceptron 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
+
     def init_weights(self):
-        init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu')) 
+        nn.init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
+
     def forward(self, x_in, apply_softmax=False):
         a_1 = F.relu(self.fc1(x_in)) # activaton function added!
         y_pred = self.fc2(a_1)
@@ -434,9 +438,12 @@ class MLP(nn.Module):
 
 
 ############################################################################################
-# # Linear model
+############################################################################################
 # # Overfitting
+############################################################################################
+
 # Though neural networks are great at capturing non-linear relationships they are highly susceptible to overfitting to the training data and failing to generalize on test data. Just take a look at the example below where we generate completely random data and are able to fit a model with [$2*N*C + D$](https://arxiv.org/abs/1611.03530) hidden units. The training performance is great but the overfitting leads to very poor test performance. We'll be covering strategies to tackle overfitting in future lessons.
+
 # Arguments
 args = Namespace(
     seed=1234,
@@ -450,18 +457,22 @@ args = Namespace(
     regularization=1e-3,
     num_epochs=1000,
 )
+
 # Set seed for reproducability
 np.random.seed(args.seed)
+
 # Generate random data
 X = torch.randn(args.num_samples_per_class*args.num_classes, args.dimensions).float()
 y = torch.LongTensor([[i]*args.num_samples_per_class 
                        for i in range(args.num_classes)]).view(-1)
 print ("X: {0}".format(np.shape(X)))
 print ("y: {0}".format(np.shape(y)))
+
 # Shuffle data
 shuffle_indicies = torch.LongTensor(random.sample(range(0, len(X)), len(X)))
 X = X[shuffle_indicies]
 y = y[shuffle_indicies]
+
 # Split datasets
 test_start_idx = int(len(X) * args.train_size)
 X_train = X[:test_start_idx] 
@@ -469,7 +480,8 @@ y_train = y[:test_start_idx]
 X_test = X[test_start_idx:] 
 y_test = y[test_start_idx:]
 print("We have %i train samples and %i test samples." % (len(X_train), len(X_test)))
-# Multilayer Perceptron 
+
+# Multilayer Perceptron
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(MLP, self).__init__()
@@ -477,7 +489,7 @@ class MLP(nn.Module):
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
     def init_weights(self):
-        init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
     def forward(self, x_in, apply_softmax=False):
         a_1 = F.relu(self.fc1(x_in)) 
         y_pred = self.fc2(a_1)
@@ -536,16 +548,16 @@ print (classification_report(y_test, pred_test))
 
 
 ############################################################################################
-# # Linear model
 # # Dropout
-# A great technique to overcome overfitting is to increase the size of your data but this isn't always an option. Fortuntely, there are methods like regularization and dropout that can help create a more robust model. We've already seen regularization and we can easily add it in our optimizer to use it in PyTorch. 
-# 
+############################################################################################
+
+# A great technique to overcome overfitting is to increase the size of your data but this isn't always an option. Fortuntely, there are methods like regularization and dropout that can help create a more robust model. We've already seen regularization and we can easily add it in our optimizer to use it in PyTorch.
 # Dropout is a technique (used only during training) that allows us to zero the outputs of neurons. We do this for p% of the total neurons in each layer and it changes every batch. Dropout prevents units from co-adapting too much to the data and acts as a sampling strategy since we drop a different set of neurons each time.
-# 
-# <img src="https://raw.githubusercontent.com/GokuMohandas/practicalAI/master/images/dropout.png" width=400>
+
 # Arguments
 args.dropout_p = 0.1 # 40% of the neurons are dropped each pass
 args.lambda_l2 = 1e-4 # L2 regularization
+
 # Multilayer Perceptron 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout_p):
@@ -554,7 +566,7 @@ class MLP(nn.Module):
         self.dropout = nn.Dropout(dropout_p) # Defining the dropout
         self.fc2 = nn.Linear(hidden_dim, output_dim)
     def init_weights(self):
-        init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_normal(self.fc1.weight, gain=nn.init.calculate_gain('relu'))
     def forward(self, x_in, apply_softmax=False):
         z = F.relu(self.fc1(x_in))
         z = self.dropout(z) # dropping neurons
@@ -562,16 +574,19 @@ class MLP(nn.Module):
         if apply_softmax:
             y_pred = F.softmax(y_pred, dim=1)
         return y_pred
+
 # Initialize model
 model = MLP(input_dim=args.dimensions, 
             hidden_dim=args.num_hidden_units, 
             output_dim=args.num_classes, 
             dropout_p=args.dropout_p)
 print (model.named_modules)
+
 # Optimization
 loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, 
                        weight_decay=args.lambda_l2) # Adding L2 regularization
+
 # Training
 pass
 
