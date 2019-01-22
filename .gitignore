@@ -8,6 +8,8 @@ dqn/
 log/
 datasets/
 experiments/
+*.csv
+names/
 
 
 **/*.pyc
